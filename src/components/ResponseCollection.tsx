@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
 import { Download, Database, BarChart3, Eye, RefreshCw, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 

@@ -9,7 +9,239 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      api_credentials: {
+        Row: {
+          created_at: string | null
+          credentials: Json
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          provider: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          credentials: Json
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          credentials?: Json
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      line_items: {
+        Row: {
+          channel_type: Database["public"]["Enums"]["channel_type"]
+          completed: number | null
+          cost_per_complete: number | null
+          created_at: string | null
+          external_id: string | null
+          id: string
+          name: string
+          project_id: string
+          quota: number
+          status: Database["public"]["Enums"]["line_item_status"] | null
+          targeting: Json
+          total_cost: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          channel_type: Database["public"]["Enums"]["channel_type"]
+          completed?: number | null
+          cost_per_complete?: number | null
+          created_at?: string | null
+          external_id?: string | null
+          id?: string
+          name: string
+          project_id: string
+          quota?: number
+          status?: Database["public"]["Enums"]["line_item_status"] | null
+          targeting?: Json
+          total_cost?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          channel_type?: Database["public"]["Enums"]["channel_type"]
+          completed?: number | null
+          cost_per_complete?: number | null
+          created_at?: string | null
+          external_id?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          quota?: number
+          status?: Database["public"]["Enums"]["line_item_status"] | null
+          targeting?: Json
+          total_cost?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "line_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          external_id: string | null
+          id: string
+          settings: Json | null
+          status: Database["public"]["Enums"]["project_status"] | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          external_id?: string | null
+          id?: string
+          settings?: Json | null
+          status?: Database["public"]["Enums"]["project_status"] | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          external_id?: string | null
+          id?: string
+          settings?: Json | null
+          status?: Database["public"]["Enums"]["project_status"] | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      quota_tracking: {
+        Row: {
+          channel_type: Database["public"]["Enums"]["channel_type"]
+          completion_rate: number | null
+          cost_tracking: number | null
+          current_count: number | null
+          id: string
+          last_updated: string | null
+          line_item_id: string
+          project_id: string
+          target_quota: number
+        }
+        Insert: {
+          channel_type: Database["public"]["Enums"]["channel_type"]
+          completion_rate?: number | null
+          cost_tracking?: number | null
+          current_count?: number | null
+          id?: string
+          last_updated?: string | null
+          line_item_id: string
+          project_id: string
+          target_quota: number
+        }
+        Update: {
+          channel_type?: Database["public"]["Enums"]["channel_type"]
+          completion_rate?: number | null
+          cost_tracking?: number | null
+          current_count?: number | null
+          id?: string
+          last_updated?: string | null
+          line_item_id?: string
+          project_id?: string
+          target_quota?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quota_tracking_line_item_id_fkey"
+            columns: ["line_item_id"]
+            isOneToOne: false
+            referencedRelation: "line_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quota_tracking_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      responses: {
+        Row: {
+          channel_type: Database["public"]["Enums"]["channel_type"]
+          completion_time: number | null
+          created_at: string | null
+          external_response_id: string | null
+          id: string
+          line_item_id: string
+          project_id: string
+          respondent_data: Json | null
+          response_data: Json | null
+          status: Database["public"]["Enums"]["response_status"]
+          updated_at: string | null
+        }
+        Insert: {
+          channel_type: Database["public"]["Enums"]["channel_type"]
+          completion_time?: number | null
+          created_at?: string | null
+          external_response_id?: string | null
+          id?: string
+          line_item_id: string
+          project_id: string
+          respondent_data?: Json | null
+          response_data?: Json | null
+          status: Database["public"]["Enums"]["response_status"]
+          updated_at?: string | null
+        }
+        Update: {
+          channel_type?: Database["public"]["Enums"]["channel_type"]
+          completion_time?: number | null
+          created_at?: string | null
+          external_response_id?: string | null
+          id?: string
+          line_item_id?: string
+          project_id?: string
+          respondent_data?: Json | null
+          response_data?: Json | null
+          status?: Database["public"]["Enums"]["response_status"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "responses_line_item_id_fkey"
+            columns: ["line_item_id"]
+            isOneToOne: false
+            referencedRelation: "line_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "responses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +250,21 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      channel_type: "dynata" | "sms" | "voice"
+      line_item_status:
+        | "draft"
+        | "active"
+        | "paused"
+        | "completed"
+        | "overquota"
+        | "cancelled"
+      project_status: "draft" | "active" | "paused" | "completed" | "cancelled"
+      response_status:
+        | "complete"
+        | "partial"
+        | "screened_out"
+        | "over_quota"
+        | "terminated"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +379,24 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      channel_type: ["dynata", "sms", "voice"],
+      line_item_status: [
+        "draft",
+        "active",
+        "paused",
+        "completed",
+        "overquota",
+        "cancelled",
+      ],
+      project_status: ["draft", "active", "paused", "completed", "cancelled"],
+      response_status: [
+        "complete",
+        "partial",
+        "screened_out",
+        "over_quota",
+        "terminated",
+      ],
+    },
   },
 } as const

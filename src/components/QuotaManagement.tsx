@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Target, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ApiService } from "@/services/apiService";
+import { LineItem, Project } from "@/types/database";
 
 interface LineItem {
   id: string;
@@ -29,56 +30,12 @@ interface LineItem {
 }
 
 interface QuotaManagementProps {
-  activeProject: any;
+  activeProject: Project | null;
 }
 
 const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
-  const [lineItems, setLineItems] = useState<LineItem[]>([
-    {
-      id: "li_001",
-      projectId: "proj_001", 
-      name: "US Adults 25-45",
-      targeting: {
-        country: "US",
-        ageRange: [25, 45],
-        gender: "All",
-        income: "$50k+"
-      },
-      quota: 400,
-      completed: 287,
-      status: "active",
-      costPerComplete: 4.50
-    },
-    {
-      id: "li_002",
-      projectId: "proj_001",
-      name: "US Women 18-34", 
-      targeting: {
-        country: "US",
-        ageRange: [18, 34],
-        gender: "Female"
-      },
-      quota: 300,
-      completed: 298,
-      status: "completed",
-      costPerComplete: 5.25
-    },
-    {
-      id: "li_003",
-      projectId: "proj_001",
-      name: "US Men 35-54",
-      targeting: {
-        country: "US", 
-        ageRange: [35, 54],
-        gender: "Male"
-      },
-      quota: 250,
-      completed: 267,
-      status: "overquota",
-      costPerComplete: 4.75
-    }
-  ]);
-
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newLineItem, setNewLineItem] = useState({
     name: "",
@@ -92,8 +49,46 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
 
   const { toast } = useToast();
 
-  const handleCreateLineItem = () => {
-    if (!newLineItem.name || !newLineItem.quota) {
+  useEffect(() => {
+    if (activeProject?.id) {
+      loadLineItems();
+      
+      // Set up real-time subscription for quota updates
+      const quotaSubscription = ApiService.subscribeToQuotaUpdates(
+        activeProject.id,
+        (payload) => {
+          console.log('Quota update received:', payload);
+          loadLineItems(); // Refresh line items when quota updates
+        }
+      );
+
+      return () => {
+        quotaSubscription.unsubscribe();
+      };
+    }
+  }, [activeProject?.id]);
+
+  const loadLineItems = async () => {
+    if (!activeProject?.id) return;
+    
+    try {
+      setLoading(true);
+      const lineItemsData = await ApiService.getLineItems(activeProject.id);
+      setLineItems(lineItemsData);
+    } catch (error) {
+      console.error('Error loading line items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load line items",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateLineItem = async () => {
+    if (!newLineItem.name || !newLineItem.quota || !activeProject?.id) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
@@ -102,38 +97,49 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
       return;
     }
 
-    const lineItem: LineItem = {
-      id: `li_${Date.now()}`,
-      projectId: activeProject?.id || "proj_001",
-      name: newLineItem.name,
-      targeting: {
+    try {
+      setLoading(true);
+      const targeting = {
         country: newLineItem.country,
         ageRange: [parseInt(newLineItem.ageMin) || 18, parseInt(newLineItem.ageMax) || 65],
         gender: newLineItem.gender,
         ...(newLineItem.income && { income: newLineItem.income })
-      },
-      quota: parseInt(newLineItem.quota),
-      completed: 0,
-      status: "active",
-      costPerComplete: 4.25 + Math.random() * 2 // Random pricing for demo
-    };
+      };
 
-    setLineItems(prev => [...prev, lineItem]);
-    setNewLineItem({
-      name: "",
-      country: "US", 
-      ageMin: "",
-      ageMax: "",
-      gender: "All",
-      quota: "",
-      income: ""
-    });
-    setIsCreateDialogOpen(false);
+      const lineItem = await ApiService.createLineItem(
+        activeProject.id,
+        newLineItem.name,
+        targeting,
+        parseInt(newLineItem.quota),
+        4.25 + Math.random() * 2 // Random pricing for demo
+      );
 
-    toast({
-      title: "Line Item Created",
-      description: `Successfully created line item: ${lineItem.name}`,
-    });
+      setLineItems(prev => [...prev, lineItem]);
+      setNewLineItem({
+        name: "",
+        country: "US", 
+        ageMin: "",
+        ageMax: "",
+        gender: "All",
+        quota: "",
+        income: ""
+      });
+      setIsCreateDialogOpen(false);
+
+      toast({
+        title: "Line Item Created",
+        description: `Successfully created line item: ${lineItem.name}`,
+      });
+    } catch (error) {
+      console.error('Error creating line item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create line item",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusColor = (status: LineItem["status"]) => {
@@ -160,7 +166,20 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
 
   const totalQuota = lineItems.reduce((sum, item) => sum + item.quota, 0);
   const totalCompleted = lineItems.reduce((sum, item) => sum + item.completed, 0);
-  const totalCost = lineItems.reduce((sum, item) => sum + (item.completed * item.costPerComplete), 0);
+  const totalCost = lineItems.reduce((sum, item) => sum + (item.completed * (item.cost_per_complete || 0)), 0);
+
+  if (!activeProject) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-slate-500">
+            <Target className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+            <p>Please select a project to manage line items and quotas</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -204,15 +223,15 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
             <div>
               <CardTitle className="flex items-center">
                 <Target className="h-5 w-5 mr-2 text-blue-600" />
-                Line Item & Quota Management
+                Multi-Channel Line Item & Quota Management
               </CardTitle>
               <CardDescription>
-                Define targeting criteria and monitor quota fulfillment across demographic segments
+                Define targeting criteria and monitor quota fulfillment across all channels
               </CardDescription>
             </div>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button disabled={loading}>
                   <Plus className="h-4 w-4 mr-2" />
                   New Line Item
                 </Button>
@@ -328,55 +347,65 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Line Item</TableHead>
-                <TableHead>Targeting</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Progress</TableHead>
-                <TableHead>Cost per Complete</TableHead>
-                <TableHead>Total Cost</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lineItems.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <div className="font-medium text-slate-900">{item.name}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm text-slate-600">
-                      <div>{item.targeting.country} • {item.targeting.gender}</div>
-                      <div>Age: {item.targeting.ageRange[0]}-{item.targeting.ageRange[1]}</div>
-                      {item.targeting.income && <div>Income: {item.targeting.income}</div>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(item.status)}>
-                      {getStatusIcon(item.status)}
-                      <span className="ml-1">{item.status}</span>
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>{item.completed} / {item.quota}</span>
-                        <span>{calculateProgress(item.completed, item.quota).toFixed(0)}%</span>
-                      </div>
-                      <Progress value={calculateProgress(item.completed, item.quota)} className="h-2" />
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">${item.costPerComplete.toFixed(2)}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">${(item.completed * item.costPerComplete).toFixed(2)}</div>
-                  </TableCell>
+          {loading && lineItems.length === 0 ? (
+            <div className="text-center py-8">Loading line items...</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Line Item</TableHead>
+                  <TableHead>Channel</TableHead>
+                  <TableHead>Targeting</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Cost per Complete</TableHead>
+                  <TableHead>Total Cost</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {lineItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <div className="font-medium text-slate-900">{item.name}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {item.channel_type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-slate-600">
+                        <div>{item.targeting.country} • {item.targeting.gender}</div>
+                        <div>Age: {item.targeting.ageRange?.[0] || 18}-{item.targeting.ageRange?.[1] || 65}</div>
+                        {item.targeting.income && <div>Income: {item.targeting.income}</div>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(item.status)}>
+                        {getStatusIcon(item.status)}
+                        <span className="ml-1">{item.status}</span>
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>{item.completed} / {item.quota}</span>
+                          <span>{calculateProgress(item.completed, item.quota).toFixed(0)}%</span>
+                        </div>
+                        <Progress value={calculateProgress(item.completed, item.quota)} className="h-2" />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">${(item.cost_per_complete || 0).toFixed(2)}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">${(item.completed * (item.cost_per_complete || 0)).toFixed(2)}</div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

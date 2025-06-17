@@ -403,7 +403,7 @@ const ResponseCollection = ({ activeProject }: ResponseCollectionProps) => {
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="font-medium">Low Quality (<70)</span>
+                        <span className="font-medium">Low Quality (&lt;70)</span>
                         <span className="text-sm text-red-600">
                           {responses.filter(r => r.qualityScore < 70).length} responses
                         </span>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,22 +13,6 @@ import { Plus, Target, TrendingUp, AlertTriangle, CheckCircle } from "lucide-rea
 import { useToast } from "@/hooks/use-toast";
 import { ApiService } from "@/services/apiService";
 import { LineItem, Project } from "@/types/database";
-
-interface LineItem {
-  id: string;
-  projectId: string;
-  name: string;
-  targeting: {
-    country: string;
-    ageRange: [number, number];
-    gender: string;
-    income?: string;
-  };
-  quota: number;
-  completed: number;
-  status: "active" | "paused" | "completed" | "overquota";
-  costPerComplete: number;
-}
 
 interface QuotaManagementProps {
   activeProject: Project | null;

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,22 +10,71 @@ import ProjectManagement from "@/components/ProjectManagement";
 import AuthenticationModule from "@/components/AuthenticationModule";
 import ResponseCollection from "@/components/ResponseCollection";
 import QuotaManagement from "@/components/QuotaManagement";
+import { ApiService } from "@/services/apiService";
 
 const Index = () => {
   const [activeProject, setActiveProject] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [projectMetrics, setProjectMetrics] = useState({
+    totalProjects: 0,
+    activeProjects: 0,
+    completedResponses: 0,
+    quotaFulfillment: 0
+  });
+  const [channelStats, setChannelStats] = useState([
+    { name: "Online (Dynata)", count: 0, percentage: 0, icon: Globe, color: "bg-blue-500" },
+    { name: "SMS", count: 0, percentage: 0, icon: MessageSquare, color: "bg-green-500" },
+    { name: "Voice", count: 0, percentage: 0, icon: Mic, color: "bg-purple-500" },
+  ]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const channelStats = [
-    { name: "Online (Dynata)", count: 1247, percentage: 45, icon: Globe, color: "bg-blue-500" },
-    { name: "SMS", count: 983, percentage: 35, icon: MessageSquare, color: "bg-green-500" },
-    { name: "Voice", count: 556, percentage: 20, icon: Mic, color: "bg-purple-500" },
-  ];
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-  const projectMetrics = {
-    totalProjects: 12,
-    activeProjects: 3,
-    completedResponses: 2786,
-    quotaFulfillment: 78
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get local projects
+      const projects = await ApiService.getLocalProjects();
+      const totalProjects = projects.length;
+      const activeProjects = projects.filter(p => p.status === 'active').length;
+      
+      // Calculate total responses and quota fulfillment
+      let totalResponses = 0;
+      let totalQuota = 0;
+      
+      projects.forEach(project => {
+        if (project.line_items) {
+          project.line_items.forEach(lineItem => {
+            totalResponses += lineItem.completed || 0;
+            totalQuota += lineItem.quota || 0;
+          });
+        }
+      });
+
+      const quotaFulfillment = totalQuota > 0 ? Math.round((totalResponses / totalQuota) * 100) : 0;
+
+      setProjectMetrics({
+        totalProjects,
+        activeProjects,
+        completedResponses: totalResponses,
+        quotaFulfillment
+      });
+
+      // Update channel stats (all 0 for now since we don't have channel-specific data yet)
+      setChannelStats([
+        { name: "Online (Dynata)", count: 0, percentage: 0, icon: Globe, color: "bg-blue-500" },
+        { name: "SMS", count: 0, percentage: 0, icon: MessageSquare, color: "bg-green-500" },
+        { name: "Voice", count: 0, percentage: 0, icon: Mic, color: "bg-purple-500" },
+      ]);
+
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -64,11 +113,21 @@ const Index = () => {
               <CardTitle className="text-sm font-medium text-slate-600">Total Projects</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{projectMetrics.totalProjects}</div>
-              <div className="flex items-center mt-2">
-                <Activity className="h-4 w-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600">+2 this month</span>
-              </div>
+              {isLoading ? (
+                <div className="text-3xl font-bold text-slate-400">Loading...</div>
+              ) : (
+                <>
+                  <div className="text-3xl font-bold text-slate-900">{projectMetrics.totalProjects}</div>
+                  {projectMetrics.totalProjects === 0 ? (
+                    <div className="text-sm text-slate-500 mt-2">No projects yet</div>
+                  ) : (
+                    <div className="flex items-center mt-2">
+                      <Activity className="h-4 w-4 text-green-500 mr-1" />
+                      <span className="text-sm text-green-600">Ready to start</span>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -77,8 +136,16 @@ const Index = () => {
               <CardTitle className="text-sm font-medium text-slate-600">Active Projects</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-blue-600">{projectMetrics.activeProjects}</div>
-              <div className="text-sm text-slate-500 mt-2">Currently running</div>
+              {isLoading ? (
+                <div className="text-3xl font-bold text-slate-400">Loading...</div>
+              ) : (
+                <>
+                  <div className="text-3xl font-bold text-blue-600">{projectMetrics.activeProjects}</div>
+                  <div className="text-sm text-slate-500 mt-2">
+                    {projectMetrics.activeProjects === 0 ? "None running" : "Currently running"}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -87,8 +154,16 @@ const Index = () => {
               <CardTitle className="text-sm font-medium text-slate-600">Total Responses</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{projectMetrics.completedResponses.toLocaleString()}</div>
-              <div className="text-sm text-slate-500 mt-2">Across all channels</div>
+              {isLoading ? (
+                <div className="text-3xl font-bold text-slate-400">Loading...</div>
+              ) : (
+                <>
+                  <div className="text-3xl font-bold text-slate-900">{projectMetrics.completedResponses.toLocaleString()}</div>
+                  <div className="text-sm text-slate-500 mt-2">
+                    {projectMetrics.completedResponses === 0 ? "No responses yet" : "Across all channels"}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -97,8 +172,14 @@ const Index = () => {
               <CardTitle className="text-sm font-medium text-slate-600">Quota Fulfillment</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-purple-600">{projectMetrics.quotaFulfillment}%</div>
-              <Progress value={projectMetrics.quotaFulfillment} className="mt-2" />
+              {isLoading ? (
+                <div className="text-3xl font-bold text-slate-400">Loading...</div>
+              ) : (
+                <>
+                  <div className="text-3xl font-bold text-purple-600">{projectMetrics.quotaFulfillment}%</div>
+                  <Progress value={projectMetrics.quotaFulfillment} className="mt-2" />
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -110,28 +191,42 @@ const Index = () => {
               <Users className="h-5 w-5 mr-2 text-blue-600" />
               Response Distribution by Channel
             </CardTitle>
-            <CardDescription>Real-time response collection across all polling channels</CardDescription>
+            <CardDescription>
+              {projectMetrics.completedResponses === 0 
+                ? "No responses collected yet - start by creating a project" 
+                : "Real-time response collection across all polling channels"
+              }
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {channelStats.map((channel) => (
-                <div key={channel.name} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${channel.color}`}>
-                      <channel.icon className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <div className="font-medium text-slate-900">{channel.name}</div>
-                      <div className="text-sm text-slate-500">{channel.count} responses</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Progress value={channel.percentage} className="w-24" />
-                    <span className="text-sm font-medium text-slate-600">{channel.percentage}%</span>
-                  </div>
+            {projectMetrics.completedResponses === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-slate-400 mb-4">
+                  <Users className="h-12 w-12 mx-auto" />
                 </div>
-              ))}
-            </div>
+                <p className="text-slate-600">Create your first project to start collecting responses</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {channelStats.map((channel) => (
+                  <div key={channel.name} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`p-2 rounded-lg ${channel.color}`}>
+                        <channel.icon className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-slate-900">{channel.name}</div>
+                        <div className="text-sm text-slate-500">{channel.count} responses</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <Progress value={channel.percentage} className="w-24" />
+                      <span className="text-sm font-medium text-slate-600">{channel.percentage}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -149,6 +244,7 @@ const Index = () => {
               isAuthenticated={isAuthenticated}
               activeProject={activeProject}
               setActiveProject={setActiveProject}
+              onProjectChange={loadDashboardData}
             />
           </TabsContent>
 

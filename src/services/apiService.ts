@@ -13,7 +13,8 @@ import {
   GeographyScope,
   QuotaMode,
   ComplexityLevel,
-  QuotaCategory
+  QuotaCategory,
+  ProjectStatus
 } from "@/types/database";
 
 export class ApiService {
@@ -54,7 +55,7 @@ export class ApiService {
     const { data, error } = await supabase
       .from('projects')
       .update({ 
-        status,
+        status: status as ProjectStatus,
         updated_at: new Date().toISOString()
       })
       .eq('id', projectId)
@@ -80,7 +81,9 @@ export class ApiService {
       const dynataProject = await this.createProject(
         localProject.title,
         localProject.description,
-        localProject.settings
+        typeof localProject.settings === 'object' && localProject.settings !== null 
+          ? localProject.settings as Record<string, any>
+          : {}
       );
 
       // Update local project with external ID

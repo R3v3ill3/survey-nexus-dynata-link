@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Project, 
@@ -14,7 +15,8 @@ import {
   QuotaMode,
   ComplexityLevel,
   QuotaCategory,
-  ProjectStatus
+  ProjectStatus,
+  LineItemStatus
 } from "@/types/database";
 
 export class ApiService {
@@ -185,7 +187,7 @@ export class ApiService {
         targeting,
         quota,
         cost_per_complete: costPerComplete || 4.25 + Math.random() * 2,
-        status: 'draft'
+        status: 'draft' as LineItemStatus
       })
       .select()
       .single();
@@ -211,7 +213,7 @@ export class ApiService {
     return data as LineItem[];
   }
 
-  static async updateLineItemStatus(lineItemId: string, status: string) {
+  static async updateLineItemStatus(lineItemId: string, status: LineItemStatus) {
     const { data, error } = await supabase
       .from('line_items')
       .update({ 
@@ -558,5 +560,154 @@ export class ApiService {
 
     if (error) throw error;
     return data;
+  }
+
+  // Quota Generator API Integration
+  static async checkQuotaGeneratorCredentials() {
+    const { data, error } = await supabase
+      .from('api_credentials')
+      .select('*')
+      .eq('provider', 'quota_generator')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async saveQuotaGeneratorCredentials(apiKey: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Authentication required');
+
+    const { data, error } = await supabase
+      .from('api_credentials')
+      .upsert({
+        user_id: user.id,
+        provider: 'quota_generator',
+        credentials: { api_key: apiKey },
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async generateQuotasFromAPI(parameters: {
+    geography: GeographyScope;
+    geographyDetail?: string;
+    quotaMode: QuotaMode;
+    sampleSize: number;
+    additionalParams?: Record<string, any>;
+  }) {
+    const credentials = await this.checkQuotaGeneratorCredentials();
+    if (!credentials?.credentials?.api_key) {
+      throw new Error('Quota Generator API key not configured');
+    }
+
+    const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/calculate-quotas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': credentials.credentials.api_key
+      },
+      body: JSON.stringify({
+        geography: parameters.geography,
+        geographyDetail: parameters.geographyDetail,
+        quotaMode: parameters.quotaMode,
+        sampleSize: parameters.sampleSize,
+        ...parameters.additionalParams
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Quota Generator API error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  static async listSavedQuotas() {
+    const credentials = await this.checkQuotaGeneratorCredentials();
+    if (!credentials?.credentials?.api_key) {
+      throw new Error('Quota Generator API key not configured');
+    }
+
+    const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas', {
+      method: 'GET',
+      headers: {
+        'x-api-key': credentials.credentials.api_key
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Quota Generator API error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  static async getSavedQuota(quotaId: string) {
+    const credentials = await this.checkQuotaGeneratorCredentials();
+    if (!credentials?.credentials?.api_key) {
+      throw new Error('Quota Generator API key not configured');
+    }
+
+    const response = await fetch(`https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/get-saved-quota/${quotaId}`, {
+      method: 'GET',
+      headers: {
+        'x-api-key': credentials.credentials.api_key
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Quota Generator API error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  // Enhanced quota processing from API
+  static async processQuotaGeneratorAPIResponse(
+    projectId: string,
+    apiResponse: any
+  ) {
+    // Create quota configuration from API response
+    const quotaConfig = await this.createQuotaConfiguration({
+      project_id: projectId,
+      geography_scope: apiResponse.geography?.scope || 'National',
+      geography_detail: apiResponse.geography?.detail,
+      quota_mode: apiResponse.quotaMode || 'non-interlocking',
+      total_quotas: apiResponse.totalQuotas || 0,
+      sample_size_multiplier: apiResponse.sampleMultiplier || 1.0,
+      complexity_level: apiResponse.complexityLevel || 'low'
+    });
+
+    // Process quota segments from API response
+    if (apiResponse.quotaSegments && Array.isArray(apiResponse.quotaSegments)) {
+      const segments = apiResponse.quotaSegments.map((segment: any) => ({
+        quota_config_id: quotaConfig.id,
+        category: segment.category as QuotaCategory,
+        segment_name: segment.name || segment.segment_name,
+        segment_code: segment.code || segment.segment_code,
+        population_percent: segment.population_percent || segment.percentage,
+        dynata_code: segment.dynata_code
+      }));
+
+      const createdSegments = await this.createQuotaSegments(segments);
+      
+      return {
+        configuration: quotaConfig,
+        segments: createdSegments,
+        apiResponse
+      };
+    }
+
+    return {
+      configuration: quotaConfig,
+      segments: [],
+      apiResponse
+    };
   }
 }

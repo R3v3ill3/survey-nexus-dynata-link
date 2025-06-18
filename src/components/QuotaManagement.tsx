@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -102,43 +101,73 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
     try {
       setLoading(true);
       
-      // Generate quota configuration using the quota generator service
-      const generatorConfig = QuotaGeneratorService.generateQuotaConfig(
-        quotaConfigForm.geography,
-        quotaConfigForm.geography === 'State' || quotaConfigForm.geography.includes('Electorate') 
-          ? quotaConfigForm.geographyDetail 
-          : undefined,
-        quotaConfigForm.quotaMode,
-        parseInt(quotaConfigForm.targetSampleSize)
-      );
+      if (quotaConfigForm.useApi && quotaConfigForm.apiResponse) {
+        // Process API-generated quota configuration
+        const result = await ApiService.processQuotaGeneratorAPIResponse(
+          activeProject.id,
+          quotaConfigForm.apiResponse
+        );
 
-      // Generate quota responses
-      const quotaResponses = QuotaGeneratorService.generateQuotaResponses(
-        generatorConfig,
-        parseInt(quotaConfigForm.targetSampleSize)
-      );
+        setQuotaConfig(result.configuration);
+        setIsQuotaConfigDialogOpen(false);
 
-      // Process with API service
-      const result = await ApiService.processQuotaGeneratorConfig(
-        activeProject.id,
-        generatorConfig,
-        quotaResponses
-      );
+        toast({
+          title: "Quota Configuration Created",
+          description: `Successfully created ${result.configuration.total_quotas} quota segments from API`,
+        });
+      } else if (quotaConfigForm.savedQuota) {
+        // Process saved quota configuration
+        const result = await ApiService.processQuotaGeneratorAPIResponse(
+          activeProject.id,
+          quotaConfigForm.savedQuota
+        );
 
-      setQuotaConfig(result.configuration);
-      setIsQuotaConfigDialogOpen(false);
+        setQuotaConfig(result.configuration);
+        setIsQuotaConfigDialogOpen(false);
 
-      toast({
-        title: "Quota Configuration Created",
-        description: `Successfully created ${generatorConfig.quotaStructure.totalQuotas} quota segments`,
-      });
+        toast({
+          title: "Quota Configuration Loaded",
+          description: `Successfully loaded saved quota configuration`,
+        });
+      } else {
+        // Generate quota configuration using the quota generator service
+        const generatorConfig = QuotaGeneratorService.generateQuotaConfig(
+          quotaConfigForm.geography,
+          quotaConfigForm.geography === 'State' || quotaConfigForm.geography.includes('Electorate') 
+            ? quotaConfigForm.geographyDetail 
+            : undefined,
+          quotaConfigForm.quotaMode,
+          parseInt(quotaConfigForm.targetSampleSize)
+        );
 
-      loadProjectData();
+        // Generate quota responses
+        const quotaResponses = QuotaGeneratorService.generateQuotaResponses(
+          generatorConfig,
+          parseInt(quotaConfigForm.targetSampleSize)
+        );
+
+        // Process with API service
+        const result = await ApiService.processQuotaGeneratorConfig(
+          activeProject.id,
+          generatorConfig,
+          quotaResponses
+        );
+
+        setQuotaConfig(result.configuration);
+        setIsQuotaConfigDialogOpen(false);
+
+        toast({
+          title: "Quota Configuration Created",
+          description: `Successfully created ${generatorConfig.quotaStructure.totalQuotas} quota segments`,
+        });
+
+        loadProjectData();
+      }
     } catch (error) {
       console.error('Error creating quota configuration:', error);
       toast({
         title: "Error",
-        description: "Failed to create quota configuration",
+        description: error instanceof Error ? error.message : "Failed to create quota configuration",
         variant: "destructive"
       });
     } finally {

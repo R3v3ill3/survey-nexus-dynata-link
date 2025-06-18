@@ -29,6 +29,7 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log('Dialog opened, existing API key:', existingApiKey);
     if (open && existingApiKey) {
       // Show masked version of existing key
       const maskedKey = `${existingApiKey.substring(0, 8)}****${existingApiKey.slice(-4)}`;
@@ -40,6 +41,19 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
     }
   }, [open, existingApiKey]);
 
+  const validateApiKeyFormat = (key: string): boolean => {
+    const trimmedKey = key.trim();
+    // Check if it's a valid API key format (should start with "qwa_" and be of reasonable length)
+    if (!trimmedKey.startsWith('qwa_') || trimmedKey.length < 20) {
+      return false;
+    }
+    // Check if it contains any curl command text or other non-API key content
+    if (trimmedKey.includes('curl') || trimmedKey.includes('http') || trimmedKey.includes('-H') || trimmedKey.includes('--header')) {
+      return false;
+    }
+    return true;
+  };
+
   const testApiKey = async (keyToTest: string) => {
     if (!keyToTest.trim() || keyToTest.includes('****')) {
       toast({
@@ -50,8 +64,20 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
       return false;
     }
 
+    // Validate API key format
+    if (!validateApiKeyFormat(keyToTest)) {
+      toast({
+        title: "Invalid API Key Format",
+        description: "API key should start with 'qwa_' and contain only the key value (no curl commands or examples)",
+        variant: "destructive"
+      });
+      return false;
+    }
+
     try {
       setTesting(true);
+      console.log('Testing API key:', keyToTest.substring(0, 8) + '****' + keyToTest.slice(-4));
+      
       // Test the API key by making a simple request
       const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas', {
         method: 'GET',
@@ -59,6 +85,8 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
           'x-api-key': keyToTest.trim()
         }
       });
+
+      console.log('API test response status:', response.status);
 
       if (response.ok) {
         setKeyStatus('valid');
@@ -79,12 +107,23 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
         throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      setKeyStatus('invalid');
-      toast({
-        title: "API Key Test Failed",
-        description: "Could not validate the API key. Please check your connection.",
-        variant: "destructive"
-      });
+      console.error('API key test error:', error);
+      
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        setKeyStatus('invalid');
+        toast({
+          title: "Connection Error",
+          description: "Cannot connect to the Quota Generator API. This may be a CORS issue or network problem. Please contact the API provider for support.",
+          variant: "destructive"
+        });
+      } else {
+        setKeyStatus('invalid');
+        toast({
+          title: "API Key Test Failed",
+          description: "Could not validate the API key. Please check your connection and try again.",
+          variant: "destructive"
+        });
+      }
       return false;
     } finally {
       setTesting(false);
@@ -105,30 +144,55 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
       return;
     }
 
+    // Validate API key format before saving
+    if (!validateApiKeyFormat(apiKey)) {
+      toast({
+        title: "Invalid API Key Format",
+        description: "API key should start with 'qwa_' and contain only the key value (no curl commands or examples)",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setLoading(true);
+      const cleanApiKey = apiKey.trim();
+      
+      console.log('Saving API key:', cleanApiKey.substring(0, 8) + '****' + cleanApiKey.slice(-4));
       
       // Test the key first
-      const isValid = await testApiKey(apiKey.trim());
+      const isValid = await testApiKey(cleanApiKey);
       if (!isValid) {
         return;
       }
 
-      await ApiService.saveQuotaGeneratorCredentials(apiKey.trim());
+      // Save the API key
+      const savedCredentials = await ApiService.saveQuotaGeneratorCredentials(cleanApiKey);
+      console.log('API key saved successfully:', savedCredentials);
       
       toast({
         title: "API Key Saved",
         description: "Your Quota Generator API key has been saved successfully",
       });
       
+      // Clear the input and trigger parent refresh
       setApiKey("");
-      onApiKeySet();
+      setKeyStatus('valid');
+      
+      // Close dialog and notify parent
       onOpenChange(false);
+      
+      // Trigger parent component refresh with a small delay to ensure the save is complete
+      setTimeout(() => {
+        console.log('Triggering parent refresh...');
+        onApiKeySet();
+      }, 100);
+      
     } catch (error) {
       console.error('Error saving API key:', error);
       toast({
-        title: "Error",
-        description: "Failed to save API key",
+        title: "Save Error",
+        description: error instanceof Error ? error.message : "Failed to save API key",
         variant: "destructive"
       });
     } finally {
@@ -137,8 +201,14 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setApiKey(e.target.value);
+    const newValue = e.target.value;
+    setApiKey(newValue);
     setKeyStatus('unknown');
+    
+    // Clear any previous validation state when user starts typing
+    if (newValue.trim() && !newValue.includes('****')) {
+      console.log('API key input changed, clearing validation state');
+    }
   };
 
   const getStatusIcon = () => {
@@ -195,6 +265,9 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
             <div className="text-sm text-slate-600 flex items-center">
               <ExternalLink className="h-3 w-3 mr-1" />
               Get your API key from the Quota Generator dashboard
+            </div>
+            <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded">
+              <strong>Note:</strong> Paste only the API key (starting with "qwa_"), not curl commands or examples
             </div>
           </div>
           

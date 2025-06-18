@@ -569,6 +569,8 @@ export class ApiService {
 
   // Quota Generator API Integration
   static async checkQuotaGeneratorCredentials() {
+    console.log('Checking quota generator credentials...');
+    
     const { data, error } = await supabase
       .from('api_credentials')
       .select('*')
@@ -576,7 +578,12 @@ export class ApiService {
       .eq('is_active', true)
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error checking credentials:', error);
+      throw error;
+    }
+    
+    console.log('Credentials check result:', data ? 'Found' : 'Not found');
     return data;
   }
 
@@ -584,18 +591,44 @@ export class ApiService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Authentication required');
 
+    // Clean and validate the API key
+    const cleanApiKey = apiKey.trim();
+    console.log('Saving API key for user:', user.id, 'Key:', cleanApiKey.substring(0, 8) + '****' + cleanApiKey.slice(-4));
+    
+    // Validate API key format
+    if (!cleanApiKey.startsWith('qwa_')) {
+      throw new Error('Invalid API key format. Key should start with "qwa_"');
+    }
+
+    // First, deactivate any existing credentials for this user and provider
+    const { error: deactivateError } = await supabase
+      .from('api_credentials')
+      .update({ is_active: false })
+      .eq('user_id', user.id)
+      .eq('provider', 'quota_generator');
+
+    if (deactivateError) {
+      console.error('Error deactivating old credentials:', deactivateError);
+    }
+
+    // Insert the new credentials
     const { data, error } = await supabase
       .from('api_credentials')
-      .upsert({
+      .insert({
         user_id: user.id,
         provider: 'quota_generator',
-        credentials: { api_key: apiKey },
+        credentials: { api_key: cleanApiKey },
         is_active: true
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error saving new credentials:', error);
+      throw error;
+    }
+    
+    console.log('API key saved successfully:', data.id);
     return data;
   }
 

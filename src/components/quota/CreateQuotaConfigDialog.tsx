@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +32,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
   const [currentApiKey, setCurrentApiKey] = useState<string>("");
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [showSavedQuotasDialog, setShowSavedQuotasDialog] = useState(false);
+  const [credentialsRefreshKey, setCredentialsRefreshKey] = useState(0);
   const { toast } = useToast();
 
   const [quotaConfigForm, setQuotaConfigForm] = useState({
@@ -45,29 +45,41 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
 
   useEffect(() => {
     if (open) {
+      console.log('Dialog opened, checking API key status...');
       checkApiKeyStatus();
     }
-  }, [open]);
+  }, [open, credentialsRefreshKey]);
 
   const checkApiKeyStatus = async () => {
     try {
+      console.log('Fetching API credentials...');
       const credentials = await ApiService.checkQuotaGeneratorCredentials();
+      
       if (credentials?.credentials) {
         const creds = credentials.credentials as ApiCredentials;
-        if (creds.api_key) {
+        console.log('Found credentials:', creds.api_key ? 'Key present' : 'No key found');
+        
+        if (creds.api_key && creds.api_key.startsWith('qwa_')) {
           setHasApiKey(true);
           setCurrentApiKey(creds.api_key);
           setApiKeyStatus('valid');
+          console.log('API key status: valid');
         } else {
+          console.log('Invalid API key format found, clearing...');
           setHasApiKey(false);
+          setCurrentApiKey("");
           setApiKeyStatus('not_set');
         }
       } else {
+        console.log('No credentials found');
         setHasApiKey(false);
+        setCurrentApiKey("");
         setApiKeyStatus('not_set');
       }
     } catch (error) {
+      console.error('Error checking API key status:', error);
       setHasApiKey(false);
+      setCurrentApiKey("");
       setApiKeyStatus('not_set');
     }
   };
@@ -92,7 +104,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
     } else if (error.message?.includes('CORS') || error.message?.includes('Failed to fetch')) {
       toast({
         title: "Connection Error",
-        description: "Unable to connect to the Quota Generator API. This may be a temporary issue.",
+        description: "Unable to connect to the Quota Generator API. This may be a CORS issue - please contact the API provider.",
         variant: "destructive"
       });
     } else {
@@ -144,6 +156,16 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
       useApi: true,
       savedQuota: savedQuota
     });
+  };
+
+  const handleApiKeySet = () => {
+    console.log('API key set callback triggered, refreshing credentials...');
+    setCredentialsRefreshKey(prev => prev + 1);
+    
+    // Force a refresh after a short delay to ensure the save is complete
+    setTimeout(() => {
+      checkApiKeyStatus();
+    }, 200);
   };
 
   const getApiKeyStatusDisplay = () => {
@@ -236,6 +258,11 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
                   <span className="text-sm font-medium text-slate-700">API Configuration</span>
                   {getApiKeyStatusDisplay()}
                 </div>
+                {currentApiKey && (
+                  <div className="mt-2 text-xs text-slate-600">
+                    Current: {currentApiKey.substring(0, 8)}****{currentApiKey.slice(-4)}
+                  </div>
+                )}
               </div>
               
               <div className="grid grid-cols-2 gap-4">
@@ -379,11 +406,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
       <QuotaGeneratorApiKeyDialog
         open={showApiKeyDialog}
         onOpenChange={setShowApiKeyDialog}
-        onApiKeySet={() => {
-          setHasApiKey(true);
-          setApiKeyStatus('valid');
-          checkApiKeyStatus();
-        }}
+        onApiKeySet={handleApiKeySet}
         existingApiKey={currentApiKey}
       />
 

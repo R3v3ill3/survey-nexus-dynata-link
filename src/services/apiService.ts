@@ -638,33 +638,29 @@ export class ApiService {
     const { api_key, survey_id } = credentials.credentials;
     
     try {
-      console.log('Making API request to generate quotas');
-      const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/generate-quotas', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': api_key,
-          ...(survey_id && { 'x-survey-id': survey_id })
-        },
-        body: JSON.stringify(config)
+      console.log('Making API request to generate quotas via edge function');
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-api-key': api_key,
+      };
+      
+      if (survey_id) {
+        headers['x-survey-id'] = survey_id;
+      }
+      
+      const { data, error } = await supabase.functions.invoke('generate-quotas', {
+        body: config,
+        headers
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('API key authentication failed');
-        } else if (response.status === 404 && survey_id) {
-          throw new Error('Survey not found with the provided Survey ID');
-        } else {
-          throw new Error(`API Error: ${response.status} - ${errorText}`);
-        }
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to generate quotas');
       }
 
-      const result = await response.json();
-      console.log('Generated quotas successfully:', result);
-      return result;
+      console.log('Generated quotas successfully:', data);
+      return data;
       
     } catch (error) {
       console.error('Error generating quotas from API:', error);
@@ -676,7 +672,7 @@ export class ApiService {
   }
 
   static async listSavedQuotas(): Promise<any[]> {
-    console.log('Fetching saved quotas from Quota Generator API');
+    console.log('Fetching saved quotas from Quota Generator API via edge function');
     
     const credentials = await this.checkQuotaGeneratorCredentials();
     if (!credentials?.credentials?.api_key) {
@@ -686,38 +682,29 @@ export class ApiService {
     const { api_key, survey_id } = credentials.credentials;
     
     try {
-      // Use survey-specific endpoint if survey_id is available
-      const endpoint = survey_id 
-        ? `https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/get-saved-quota/${survey_id}`
-        : 'https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas';
+      const headers: Record<string, string> = {
+        'x-api-key': api_key,
+        'Content-Type': 'application/json'
+      };
       
-      console.log('Making API request to:', endpoint);
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers: {
-          'x-api-key': api_key,
-          'Content-Type': 'application/json'
-        }
+      if (survey_id) {
+        headers['x-survey-id'] = survey_id;
+      }
+      
+      console.log('Making API request via edge function');
+      const { data, error } = await supabase.functions.invoke('list-saved-quotas', {
+        headers
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('API key authentication failed');
-        } else if (response.status === 404 && survey_id) {
-          throw new Error('No saved quotas found for this survey');
-        } else {
-          throw new Error(`API Error: ${response.status} - ${errorText}`);
-        }
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to fetch saved quotas');
       }
 
-      const result = await response.json();
-      console.log('Fetched saved quotas successfully:', result);
+      console.log('Fetched saved quotas successfully:', data);
       
       // Handle both single quota response and array response
-      return Array.isArray(result) ? result : [result];
+      return Array.isArray(data) ? data : [data];
       
     } catch (error) {
       console.error('Error fetching saved quotas:', error);
@@ -740,26 +727,27 @@ export class ApiService {
     }
 
     try {
-      const response = await fetch(`https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/get-saved-quota/${quotaId}`, {
-        method: 'GET',
+      const { data, error } = await supabase.functions.invoke(`get-saved-quota/${quotaId}`, {
         headers: {
           'x-api-key': creds.api_key
         }
       });
 
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
+      if (error) {
+        console.error('Edge function error:', error);
+        if (error.message?.includes('401') || error.message?.includes('403')) {
           throw new Error('API authentication failed. Please check your API key.');
         }
-        throw new Error(`Quota Generator API error: ${response.statusText}`);
+        throw new Error(error.message || 'Failed to fetch saved quota');
       }
 
-      return await response.json();
+      return data;
     } catch (error) {
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error('Network error: Unable to connect to the Quota Generator API.');
+      console.error('Error fetching saved quota:', error);
+      if (error instanceof Error) {
+        throw error;
       }
-      throw error;
+      throw new Error('Failed to fetch saved quota');
     }
   }
 
@@ -806,17 +794,16 @@ export class ApiService {
     };
   }
 
-  // New method to test API key validity
+  // New method to test API key validity - Updated to use edge function
   static async testQuotaGeneratorApiKey(apiKey: string): Promise<boolean> {
     try {
-      const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas', {
-        method: 'GET',
+      const { data, error } = await supabase.functions.invoke('list-saved-quotas', {
         headers: {
           'x-api-key': apiKey
         }
       });
 
-      return response.ok;
+      return !error;
     } catch (error) {
       console.error('Error testing API key:', error);
       return false;

@@ -4,6 +4,31 @@ export type ProjectStatus = 'draft' | 'active' | 'paused' | 'completed' | 'cance
 export type LineItemStatus = 'draft' | 'active' | 'paused' | 'completed' | 'overquota' | 'cancelled';
 export type ResponseStatus = 'complete' | 'partial' | 'screened_out' | 'over_quota' | 'terminated';
 
+// New quota-related types
+export type GeographyScope = 'National' | 'State' | 'Federal Electorate' | 'State Electorate';
+export type QuotaMode = 
+  | 'non-interlocking' 
+  | 'full-interlocking' 
+  | 'age-gender-location' 
+  | 'age-gender-state'
+  | 'state-location'
+  | 'tas-age-gender-only'
+  | 'tas-non-interlocking'
+  | 'tas-interlocking'
+  | 'age-gender-only';
+
+export type ComplexityLevel = 'low' | 'medium' | 'high' | 'extreme';
+export type QuotaCategory = 
+  | 'Age/Gender' 
+  | 'State' 
+  | 'Location' 
+  | 'Age/Gender/State' 
+  | 'Age/Gender/Location' 
+  | 'State/Location'
+  | 'Age/Gender/State/Location'
+  | 'Sub-Electorate'
+  | 'Age/Gender/Sub-Electorate';
+
 export interface Project {
   id: string;
   user_id: string;
@@ -15,6 +40,7 @@ export interface Project {
   created_at: string;
   updated_at: string;
   line_items?: LineItem[];
+  quota_configuration?: QuotaConfiguration;
 }
 
 export interface LineItem {
@@ -32,6 +58,7 @@ export interface LineItem {
   created_at: string;
   updated_at: string;
   quota_tracking?: QuotaTracking[];
+  quota_allocations?: QuotaAllocation[];
 }
 
 export interface Response {
@@ -58,6 +85,114 @@ export interface QuotaTracking {
   completion_rate: number;
   cost_tracking: number;
   last_updated: string;
+}
+
+// New quota management interfaces
+export interface QuotaConfiguration {
+  id: string;
+  project_id: string;
+  geography_scope: GeographyScope;
+  geography_detail?: string;
+  quota_mode: QuotaMode;
+  total_quotas: number;
+  sample_size_multiplier: number;
+  complexity_level: ComplexityLevel;
+  created_at: string;
+  updated_at: string;
+  segments?: QuotaSegment[];
+}
+
+export interface QuotaSegment {
+  id: string;
+  quota_config_id: string;
+  category: QuotaCategory;
+  segment_name: string;
+  segment_code: string;
+  population_percent?: number;
+  dynata_code?: string;
+  created_at: string;
+  allocations?: QuotaAllocation[];
+}
+
+export interface QuotaAllocation {
+  id: string;
+  line_item_id: string;
+  segment_id: string;
+  quota_count: number;
+  completed_count: number;
+  cost_per_complete?: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  segment?: QuotaSegment;
+  tracking?: SegmentTracking;
+}
+
+export interface SegmentTracking {
+  id: string;
+  project_id: string;
+  segment_id: string;
+  allocation_id: string;
+  current_count: number;
+  completion_rate: number;
+  performance_score: number;
+  cost_tracking: number;
+  last_response_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Australian demographic segments from quota generator
+export interface AgeGenderSegment {
+  name: string;
+  code: string;
+}
+
+export interface LocationSegment {
+  name: string;
+  percentage: number;
+  code: string;
+}
+
+export interface StateSegment {
+  name: string;
+  code: string;
+}
+
+// Quota generator API response format
+export interface QuotaGeneratorResponse {
+  category: string;
+  subCategory: string;
+  population_percent: number;
+  quota_count: number;
+  dynata_code: string;
+}
+
+export interface QuotaStructure {
+  totalQuotas: number;
+  categories: Array<{
+    category: string;
+    quotaCount: number;
+    segments: string;
+    warning?: string;
+    dynataCodeFormat?: string;
+  }>;
+}
+
+export interface QuotaGeneratorConfig {
+  geography: {
+    scope: GeographyScope;
+    state?: string;
+    electorate?: string;
+  };
+  quotaMode: QuotaMode;
+  quotaStructure: QuotaStructure;
+  sampleSizeRecommendations?: {
+    low_complexity: string;
+    medium_complexity: string;
+    high_complexity: string;
+    extreme_complexity: string;
+  };
 }
 
 export interface ApiCredentials {

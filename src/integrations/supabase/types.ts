@@ -134,6 +134,145 @@ export type Database = {
         }
         Relationships: []
       }
+      quota_allocations: {
+        Row: {
+          completed_count: number | null
+          cost_per_complete: number | null
+          created_at: string | null
+          id: string
+          line_item_id: string
+          quota_count: number
+          segment_id: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          completed_count?: number | null
+          cost_per_complete?: number | null
+          created_at?: string | null
+          id?: string
+          line_item_id: string
+          quota_count: number
+          segment_id: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          completed_count?: number | null
+          cost_per_complete?: number | null
+          created_at?: string | null
+          id?: string
+          line_item_id?: string
+          quota_count?: number
+          segment_id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quota_allocations_line_item_id_fkey"
+            columns: ["line_item_id"]
+            isOneToOne: false
+            referencedRelation: "line_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quota_allocations_segment_id_fkey"
+            columns: ["segment_id"]
+            isOneToOne: false
+            referencedRelation: "quota_segments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quota_configurations: {
+        Row: {
+          complexity_level: string | null
+          created_at: string | null
+          geography_detail: string | null
+          geography_scope: string
+          id: string
+          project_id: string
+          quota_mode: string
+          sample_size_multiplier: number | null
+          total_quotas: number
+          updated_at: string | null
+        }
+        Insert: {
+          complexity_level?: string | null
+          created_at?: string | null
+          geography_detail?: string | null
+          geography_scope: string
+          id?: string
+          project_id: string
+          quota_mode: string
+          sample_size_multiplier?: number | null
+          total_quotas: number
+          updated_at?: string | null
+        }
+        Update: {
+          complexity_level?: string | null
+          created_at?: string | null
+          geography_detail?: string | null
+          geography_scope?: string
+          id?: string
+          project_id?: string
+          quota_mode?: string
+          sample_size_multiplier?: number | null
+          total_quotas?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quota_configurations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quota_segments: {
+        Row: {
+          category: string
+          created_at: string | null
+          dynata_code: string | null
+          id: string
+          population_percent: number | null
+          quota_config_id: string
+          segment_code: string
+          segment_name: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          dynata_code?: string | null
+          id?: string
+          population_percent?: number | null
+          quota_config_id: string
+          segment_code: string
+          segment_name: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          dynata_code?: string | null
+          id?: string
+          population_percent?: number | null
+          quota_config_id?: string
+          segment_code?: string
+          segment_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quota_segments_quota_config_id_fkey"
+            columns: ["quota_config_id"]
+            isOneToOne: false
+            referencedRelation: "quota_configurations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quota_tracking: {
         Row: {
           channel_type: Database["public"]["Enums"]["channel_type"]
@@ -238,6 +377,70 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      segment_tracking: {
+        Row: {
+          allocation_id: string
+          completion_rate: number | null
+          cost_tracking: number | null
+          created_at: string | null
+          current_count: number | null
+          id: string
+          last_response_at: string | null
+          performance_score: number | null
+          project_id: string
+          segment_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          allocation_id: string
+          completion_rate?: number | null
+          cost_tracking?: number | null
+          created_at?: string | null
+          current_count?: number | null
+          id?: string
+          last_response_at?: string | null
+          performance_score?: number | null
+          project_id: string
+          segment_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          allocation_id?: string
+          completion_rate?: number | null
+          cost_tracking?: number | null
+          created_at?: string | null
+          current_count?: number | null
+          id?: string
+          last_response_at?: string | null
+          performance_score?: number | null
+          project_id?: string
+          segment_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "segment_tracking_allocation_id_fkey"
+            columns: ["allocation_id"]
+            isOneToOne: false
+            referencedRelation: "quota_allocations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "segment_tracking_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "segment_tracking_segment_id_fkey"
+            columns: ["segment_id"]
+            isOneToOne: false
+            referencedRelation: "quota_segments"
             referencedColumns: ["id"]
           },
         ]

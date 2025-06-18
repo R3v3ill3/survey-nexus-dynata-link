@@ -629,16 +629,6 @@ export class ApiService {
 
   static async generateQuotasFromAPI(config: any): Promise<any> {
     console.log('Generating quotas from Quota Generator API with config:', config);
-
-    try {
-      console.log('Making API request to generate quotas via edge function');
-      console.log('Frontend sending config to Edge Function:', config); // <--- ADD THIS LINE
-      console.log('Frontend sending headers to Edge Function:', headers); // <--- AND THIS LINE
-
-      const { data, error } = await supabase.functions.invoke('generate-quotas', {
-        body: config,
-        headers
-      });
     
     const credentials = await this.checkQuotaGeneratorCredentials();
     if (!credentials?.credentials?.api_key) {

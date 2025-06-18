@@ -68,7 +68,9 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
 
       // Load quota configuration
       const quotaConfigData = await ApiService.getQuotaConfiguration(activeProject.id);
-      setQuotaConfig(quotaConfigData);
+      if (quotaConfigData) {
+        setQuotaConfig(quotaConfigData);
+      }
 
       // Load segment tracking
       const trackingData = await ApiService.getSegmentTracking(activeProject.id);

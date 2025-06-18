@@ -10,7 +10,11 @@ import {
   QuotaAllocation,
   SegmentTracking,
   QuotaGeneratorConfig,
-  QuotaGeneratorResponse
+  QuotaGeneratorResponse,
+  GeographyScope,
+  QuotaMode,
+  ComplexityLevel,
+  QuotaCategory
 } from "@/types/database";
 
 export class ApiService {
@@ -102,18 +106,26 @@ export class ApiService {
   }
 
   // Quota Configuration Management
-  static async createQuotaConfiguration(config: Partial<QuotaConfiguration>) {
+  static async createQuotaConfiguration(config: Omit<QuotaConfiguration, 'id' | 'created_at' | 'updated_at'>) {
     const { data, error } = await supabase
       .from('quota_configurations')
-      .insert(config)
+      .insert({
+        project_id: config.project_id,
+        geography_scope: config.geography_scope,
+        geography_detail: config.geography_detail,
+        quota_mode: config.quota_mode,
+        total_quotas: config.total_quotas,
+        sample_size_multiplier: config.sample_size_multiplier,
+        complexity_level: config.complexity_level
+      })
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return data as QuotaConfiguration;
   }
 
-  static async getQuotaConfiguration(projectId: string) {
+  static async getQuotaConfiguration(projectId: string): Promise<QuotaConfiguration | null> {
     const { data, error } = await supabase
       .from('quota_configurations')
       .select(`
@@ -130,18 +142,40 @@ export class ApiService {
       .maybeSingle();
 
     if (error) throw error;
-    return data;
+    if (!data) return null;
+
+    // Type cast the data to match our interfaces
+    return {
+      ...data,
+      geography_scope: data.geography_scope as GeographyScope,
+      quota_mode: data.quota_mode as QuotaMode,
+      complexity_level: data.complexity_level as ComplexityLevel,
+      segments: data.segments?.map(segment => ({
+        ...segment,
+        category: segment.category as QuotaCategory
+      }))
+    } as QuotaConfiguration;
   }
 
   // Quota Segments Management
-  static async createQuotaSegments(segments: Partial<QuotaSegment>[]) {
+  static async createQuotaSegments(segments: Omit<QuotaSegment, 'id' | 'created_at'>[]) {
     const { data, error } = await supabase
       .from('quota_segments')
-      .insert(segments)
+      .insert(segments.map(segment => ({
+        quota_config_id: segment.quota_config_id,
+        category: segment.category,
+        segment_name: segment.segment_name,
+        segment_code: segment.segment_code,
+        population_percent: segment.population_percent,
+        dynata_code: segment.dynata_code
+      })))
       .select();
 
     if (error) throw error;
-    return data;
+    return data.map(segment => ({
+      ...segment,
+      category: segment.category as QuotaCategory
+    })) as QuotaSegment[];
   }
 
   static async getQuotaSegments(quotaConfigId: string) {
@@ -151,18 +185,28 @@ export class ApiService {
       .eq('quota_config_id', quotaConfigId);
 
     if (error) throw error;
-    return data;
+    return data.map(segment => ({
+      ...segment,
+      category: segment.category as QuotaCategory
+    })) as QuotaSegment[];
   }
 
   // Quota Allocations Management
-  static async createQuotaAllocations(allocations: Partial<QuotaAllocation>[]) {
+  static async createQuotaAllocations(allocations: Omit<QuotaAllocation, 'id' | 'created_at' | 'updated_at'>[]) {
     const { data, error } = await supabase
       .from('quota_allocations')
-      .insert(allocations)
+      .insert(allocations.map(allocation => ({
+        line_item_id: allocation.line_item_id,
+        segment_id: allocation.segment_id,
+        quota_count: allocation.quota_count,
+        completed_count: allocation.completed_count || 0,
+        cost_per_complete: allocation.cost_per_complete,
+        status: allocation.status || 'active'
+      })))
       .select();
 
     if (error) throw error;
-    return data;
+    return data as QuotaAllocation[];
   }
 
   static async getQuotaAllocations(lineItemId: string) {
@@ -176,7 +220,13 @@ export class ApiService {
       .eq('line_item_id', lineItemId);
 
     if (error) throw error;
-    return data;
+    return data.map(allocation => ({
+      ...allocation,
+      segment: allocation.segment ? {
+        ...allocation.segment,
+        category: allocation.segment.category as QuotaCategory
+      } : undefined
+    })) as QuotaAllocation[];
   }
 
   // Segment Tracking
@@ -191,7 +241,13 @@ export class ApiService {
       .eq('project_id', projectId);
 
     if (error) throw error;
-    return data;
+    return data.map(tracking => ({
+      ...tracking,
+      segment: tracking.segment ? {
+        ...tracking.segment,
+        category: tracking.segment.category as QuotaCategory
+      } : undefined
+    })) as SegmentTracking[];
   }
 
   // Integration with Quota Generator
@@ -214,7 +270,7 @@ export class ApiService {
     // Create quota segments from generator responses
     const segments = quotaResponses.map(response => ({
       quota_config_id: quotaConfig.id,
-      category: response.category,
+      category: response.category as QuotaCategory,
       segment_name: response.subCategory,
       segment_code: this.generateSegmentCode(response.category, response.subCategory),
       population_percent: response.population_percent,
@@ -230,25 +286,30 @@ export class ApiService {
   }
 
   // Helper methods
-  private static getSampleSizeMultiplier(quotaMode: string): number {
-    const multipliers: Record<string, number> = {
+  private static getSampleSizeMultiplier(quotaMode: QuotaMode): number {
+    const multipliers: Record<QuotaMode, number> = {
       'non-interlocking': 1.0,
       'age-gender-location': 1.2,
       'age-gender-state': 1.3,
       'state-location': 1.3,
       'tas-interlocking': 1.5,
-      'full-interlocking': 2.0
+      'full-interlocking': 2.0,
+      'age-gender-only': 1.0,
+      'tas-age-gender-only': 1.0,
+      'tas-non-interlocking': 1.3
     };
     return multipliers[quotaMode] || 1.0;
   }
 
-  private static getComplexityLevel(quotaMode: string): string {
-    const complexityMap: Record<string, string> = {
+  private static getComplexityLevel(quotaMode: QuotaMode): ComplexityLevel {
+    const complexityMap: Record<QuotaMode, ComplexityLevel> = {
       'non-interlocking': 'low',
       'age-gender-only': 'low',
       'age-gender-location': 'medium',
       'age-gender-state': 'medium',
       'state-location': 'medium',
+      'tas-age-gender-only': 'low',
+      'tas-non-interlocking': 'medium',
       'tas-interlocking': 'high',
       'full-interlocking': 'extreme'
     };

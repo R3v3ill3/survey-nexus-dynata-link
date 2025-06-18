@@ -35,19 +35,19 @@ const QuotaSegmentsTable = ({ segmentTracking }: QuotaSegmentsTableProps) => {
                 <TableRow key={tracking.id}>
                   <TableCell>
                     <div className="font-medium">
-                      {tracking.segment?.segment_name}
+                      {tracking.segment?.segment_name || 'Unknown Segment'}
                     </div>
                     <div className="text-sm text-slate-500">
-                      {tracking.segment?.segment_code}
+                      {tracking.segment?.segment_code || 'N/A'}
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">
-                      {tracking.segment?.category}
+                      {tracking.segment?.category || 'N/A'}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {tracking.segment?.population_percent?.toFixed(1)}%
+                    {tracking.segment?.population_percent?.toFixed(1) || '0.0'}%
                   </TableCell>
                   <TableCell>
                     {tracking.current_count}

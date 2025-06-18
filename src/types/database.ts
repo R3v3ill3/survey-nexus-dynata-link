@@ -1,4 +1,3 @@
-
 export type ChannelType = 'dynata' | 'sms' | 'voice';
 export type ProjectStatus = 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
 export type LineItemStatus = 'draft' | 'active' | 'paused' | 'completed' | 'overquota' | 'cancelled';
@@ -140,6 +139,8 @@ export interface SegmentTracking {
   last_response_at?: string;
   created_at: string;
   updated_at: string;
+  segment?: QuotaSegment;
+  allocation?: QuotaAllocation;
 }
 
 // Australian demographic segments from quota generator

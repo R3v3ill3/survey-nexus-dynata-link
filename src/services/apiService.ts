@@ -629,6 +629,10 @@ export class ApiService {
 
   static async generateQuotasFromAPI(config: any): Promise<any> {
     console.log('Generating quotas from Quota Generator API with config:', config);
+
+    if (!config) {
+        throw new Error('Configuration object is missing.');
+    }
     
     const credentials = await this.checkQuotaGeneratorCredentials();
     if (!credentials?.credentials?.api_key) {
@@ -650,7 +654,7 @@ export class ApiService {
       }
       
       const { data, error } = await supabase.functions.invoke('generate-quotas', {
-        body: config,
+        body: JSON.stringify(config),
         headers
       });
 

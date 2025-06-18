@@ -200,7 +200,11 @@ export interface ApiCredentials {
   id: string;
   user_id: string;
   provider: string;
-  credentials: Record<string, any>;
+  credentials: {
+    api_key: string;
+    survey_id?: string;
+    [key: string]: any;
+  };
   is_active: boolean;
   expires_at?: string;
   created_at: string;

@@ -568,7 +568,7 @@ export class ApiService {
   }
 
   // Quota Generator API Integration
-  static async checkQuotaGeneratorCredentials() {
+  static async checkQuotaGeneratorCredentials(): Promise<any> {
     console.log('Checking quota generator credentials...');
     
     const { data, error } = await supabase
@@ -587,140 +587,148 @@ export class ApiService {
     return data;
   }
 
-  static async saveQuotaGeneratorCredentials(apiKey: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Authentication required');
-
-    // Clean and validate the API key
-    const cleanApiKey = apiKey.trim();
-    console.log('Saving API key for user:', user.id, 'Key:', cleanApiKey.substring(0, 8) + '****' + cleanApiKey.slice(-4));
+  static async saveQuotaGeneratorCredentials(apiKey: string, surveyId?: string): Promise<any> {
+    console.log('Saving Quota Generator credentials with survey context');
     
-    // Validate API key format
-    if (!cleanApiKey.startsWith('qwa_')) {
-      throw new Error('Invalid API key format. Key should start with "qwa_"');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
     }
 
-    // First, deactivate any existing credentials for this user and provider
-    const { error: deactivateError } = await supabase
+    // Deactivate any existing quota generator credentials
+    await supabase
       .from('api_credentials')
       .update({ is_active: false })
       .eq('user_id', user.id)
       .eq('provider', 'quota_generator');
 
-    if (deactivateError) {
-      console.error('Error deactivating old credentials:', deactivateError);
-    }
+    // Create enhanced credentials object
+    const credentials = surveyId ? 
+      { api_key: apiKey, survey_id: surveyId } : 
+      { api_key: apiKey };
 
-    // Insert the new credentials
+    console.log('Saving credentials:', { 
+      ...credentials, 
+      api_key: apiKey.substring(0, 8) + '****' + apiKey.slice(-4) 
+    });
+
     const { data, error } = await supabase
       .from('api_credentials')
       .insert({
         user_id: user.id,
         provider: 'quota_generator',
-        credentials: { api_key: cleanApiKey },
+        credentials,
         is_active: true
       })
       .select()
       .single();
 
     if (error) {
-      console.error('Error saving new credentials:', error);
-      throw error;
+      console.error('Error saving credentials:', error);
+      throw new Error(`Failed to save credentials: ${error.message}`);
     }
-    
-    console.log('API key saved successfully:', data.id);
+
     return data;
   }
 
-  static async generateQuotasFromAPI(parameters: {
-    geography: GeographyScope;
-    geographyDetail?: string;
-    quotaMode: QuotaMode;
-    sampleSize: number;
-    additionalParams?: Record<string, any>;
-  }) {
+  static async generateQuotasFromAPI(config: any): Promise<any> {
+    console.log('Generating quotas from Quota Generator API with config:', config);
+    
     const credentials = await this.checkQuotaGeneratorCredentials();
-    if (!credentials?.credentials) {
+    if (!credentials?.credentials?.api_key) {
       throw new Error('Quota Generator API key not configured');
     }
 
-    const creds = credentials.credentials as ApiCredentials;
-    if (!creds.api_key) {
-      throw new Error('Quota Generator API key not found in credentials');
-    }
-
+    const { api_key, survey_id } = credentials.credentials;
+    
     try {
-      const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/calculate-quotas', {
+      console.log('Making API request to generate quotas');
+      const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/generate-quotas', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': creds.api_key
+          'x-api-key': api_key,
+          ...(survey_id && { 'x-survey-id': survey_id })
         },
-        body: JSON.stringify({
-          geography: parameters.geography,
-          geographyDetail: parameters.geographyDetail,
-          quotaMode: parameters.quotaMode,
-          sampleSize: parameters.sampleSize,
-          ...parameters.additionalParams
-        })
+        body: JSON.stringify(config)
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('API authentication failed (401). Please check your API key.');
-        } else if (response.status === 403) {
-          throw new Error('API access forbidden (403). Your API key may not have the required permissions.');
-        } else if (response.status === 429) {
-          throw new Error('API rate limit exceeded (429). Please try again later.');
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('API key authentication failed');
+        } else if (response.status === 404 && survey_id) {
+          throw new Error('Survey not found with the provided Survey ID');
         } else {
-          throw new Error(`Quota Generator API error (${response.status}): ${response.statusText}`);
+          throw new Error(`API Error: ${response.status} - ${errorText}`);
         }
       }
 
-      return await response.json();
-    } catch (error) {
-      // Handle network errors specifically
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error('Network error: Unable to connect to the Quota Generator API. Please check your internet connection or try again later.');
-      }
+      const result = await response.json();
+      console.log('Generated quotas successfully:', result);
+      return result;
       
-      // Re-throw other errors as-is
-      throw error;
+    } catch (error) {
+      console.error('Error generating quotas from API:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Failed to generate quotas from API');
     }
   }
 
-  static async listSavedQuotas() {
+  static async listSavedQuotas(): Promise<any[]> {
+    console.log('Fetching saved quotas from Quota Generator API');
+    
     const credentials = await this.checkQuotaGeneratorCredentials();
-    if (!credentials?.credentials) {
+    if (!credentials?.credentials?.api_key) {
       throw new Error('Quota Generator API key not configured');
     }
 
-    const creds = credentials.credentials as ApiCredentials;
-    if (!creds.api_key) {
-      throw new Error('Quota Generator API key not found in credentials');
-    }
-
+    const { api_key, survey_id } = credentials.credentials;
+    
     try {
-      const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas', {
+      // Use survey-specific endpoint if survey_id is available
+      const endpoint = survey_id 
+        ? `https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/get-saved-quota/${survey_id}`
+        : 'https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas';
+      
+      console.log('Making API request to:', endpoint);
+      const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          'x-api-key': creds.api_key
+          'x-api-key': api_key,
+          'Content-Type': 'application/json'
         }
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        
         if (response.status === 401 || response.status === 403) {
-          throw new Error('API authentication failed. Please check your API key.');
+          throw new Error('API key authentication failed');
+        } else if (response.status === 404 && survey_id) {
+          throw new Error('No saved quotas found for this survey');
+        } else {
+          throw new Error(`API Error: ${response.status} - ${errorText}`);
         }
-        throw new Error(`Quota Generator API error: ${response.statusText}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      console.log('Fetched saved quotas successfully:', result);
+      
+      // Handle both single quota response and array response
+      return Array.isArray(result) ? result : [result];
+      
     } catch (error) {
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error('Network error: Unable to connect to the Quota Generator API.');
+      console.error('Error fetching saved quotas:', error);
+      if (error instanceof Error) {
+        throw error;
       }
-      throw error;
+      throw new Error('Failed to fetch saved quotas');
     }
   }
 

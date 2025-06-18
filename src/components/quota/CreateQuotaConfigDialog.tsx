@@ -15,6 +15,7 @@ import SavedQuotasDialog from "./SavedQuotasDialog";
 // Type for API credentials
 interface ApiCredentials {
   api_key: string;
+  survey_id?: string;
   [key: string]: any;
 }
 
@@ -30,6 +31,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
   const [hasApiKey, setHasApiKey] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'valid' | 'invalid' | 'not_set'>('not_set');
   const [currentApiKey, setCurrentApiKey] = useState<string>("");
+  const [currentSurveyId, setCurrentSurveyId] = useState<string>("");
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [showSavedQuotasDialog, setShowSavedQuotasDialog] = useState(false);
   const [credentialsRefreshKey, setCredentialsRefreshKey] = useState(0);
@@ -45,7 +47,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
 
   useEffect(() => {
     if (open) {
-      console.log('Dialog opened, checking API key status...');
+      console.log('Dialog opened, checking API credentials status...');
       checkApiKeyStatus();
     }
   }, [open, credentialsRefreshKey]);
@@ -56,30 +58,37 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
       const credentials = await ApiService.checkQuotaGeneratorCredentials();
       
       if (credentials?.credentials) {
-        const creds = credentials.credentials as ApiCredentials;
-        console.log('Found credentials:', creds.api_key ? 'Key present' : 'No key found');
+        const creds = credentials.credentials as any;
+        console.log('Found credentials:', { 
+          hasApiKey: creds.api_key ? 'Yes' : 'No',
+          hasSurveyId: creds.survey_id ? 'Yes' : 'No'
+        });
         
         if (creds.api_key && creds.api_key.startsWith('qwa_')) {
           setHasApiKey(true);
           setCurrentApiKey(creds.api_key);
+          setCurrentSurveyId(creds.survey_id || "");
           setApiKeyStatus('valid');
-          console.log('API key status: valid');
+          console.log('API credentials status: valid');
         } else {
           console.log('Invalid API key format found, clearing...');
           setHasApiKey(false);
           setCurrentApiKey("");
+          setCurrentSurveyId("");
           setApiKeyStatus('not_set');
         }
       } else {
         console.log('No credentials found');
         setHasApiKey(false);
         setCurrentApiKey("");
+        setCurrentSurveyId("");
         setApiKeyStatus('not_set');
       }
     } catch (error) {
-      console.error('Error checking API key status:', error);
+      console.error('Error checking API credentials status:', error);
       setHasApiKey(false);
       setCurrentApiKey("");
+      setCurrentSurveyId("");
       setApiKeyStatus('not_set');
     }
   };
@@ -159,7 +168,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
   };
 
   const handleApiKeySet = () => {
-    console.log('API key set callback triggered, refreshing credentials...');
+    console.log('API credentials set callback triggered, refreshing credentials...');
     setCredentialsRefreshKey(prev => prev + 1);
     
     // Force a refresh after a short delay to ensure the save is complete
@@ -174,7 +183,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
         return (
           <div className="flex items-center text-green-600 text-sm">
             <Check className="h-4 w-4 mr-1" />
-            API key configured and valid
+            API credentials configured and valid
             <Button 
               variant="ghost" 
               size="sm" 
@@ -190,7 +199,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
         return (
           <div className="flex items-center text-red-600 text-sm">
             <AlertTriangle className="h-4 w-4 mr-1" />
-            API key invalid or rejected
+            API credentials invalid or rejected
             <Button 
               variant="ghost" 
               size="sm" 
@@ -206,7 +215,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
         return (
           <div className="flex items-center text-slate-600 text-sm">
             <Key className="h-4 w-4 mr-1" />
-            No API key configured
+            No API credentials configured
             <Button 
               variant="ghost" 
               size="sm" 
@@ -252,15 +261,22 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
                 Generate sophisticated quota structures using the Quota Generator API with real Australian demographic data
               </div>
 
-              {/* API Key Status Display */}
+              {/* Enhanced API Credentials Status Display */}
               <div className="bg-slate-50 p-3 rounded-lg border">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-slate-700">API Configuration</span>
                   {getApiKeyStatusDisplay()}
                 </div>
                 {currentApiKey && (
-                  <div className="mt-2 text-xs text-slate-600">
-                    Current: {currentApiKey.substring(0, 8)}****{currentApiKey.slice(-4)}
+                  <div className="mt-2 space-y-1">
+                    <div className="text-xs text-slate-600">
+                      API Key: {currentApiKey.substring(0, 8)}****{currentApiKey.slice(-4)}
+                    </div>
+                    {currentSurveyId && (
+                      <div className="text-xs text-slate-600">
+                        Survey ID: {currentSurveyId}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -408,6 +424,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
         onOpenChange={setShowApiKeyDialog}
         onApiKeySet={handleApiKeySet}
         existingApiKey={currentApiKey}
+        existingSurveyId={currentSurveyId}
       />
 
       <SavedQuotasDialog

@@ -8,9 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { ApiService } from "@/services/apiService";
 import { Key, ExternalLink, Check, AlertTriangle, Loader2 } from "lucide-react";
 
-// Type for API credentials
-interface ApiCredentials {
+// Type for enhanced API credentials with survey ID
+interface EnhancedApiCredentials {
   api_key: string;
+  survey_id: string;
   [key: string]: any;
 }
 
@@ -19,27 +20,37 @@ interface QuotaGeneratorApiKeyDialogProps {
   onOpenChange: (open: boolean) => void;
   onApiKeySet: () => void;
   existingApiKey?: string;
+  existingSurveyId?: string;
 }
 
-const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingApiKey }: QuotaGeneratorApiKeyDialogProps) => {
+const QuotaGeneratorApiKeyDialog = ({ 
+  open, 
+  onOpenChange, 
+  onApiKeySet, 
+  existingApiKey,
+  existingSurveyId 
+}: QuotaGeneratorApiKeyDialogProps) => {
   const [apiKey, setApiKey] = useState("");
+  const [surveyId, setSurveyId] = useState("");
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [keyStatus, setKeyStatus] = useState<'valid' | 'invalid' | 'unknown'>('unknown');
   const { toast } = useToast();
 
   useEffect(() => {
-    console.log('Dialog opened, existing API key:', existingApiKey);
+    console.log('Dialog opened, existing credentials:', { apiKey: existingApiKey ? 'present' : 'none', surveyId: existingSurveyId });
     if (open && existingApiKey) {
       // Show masked version of existing key
       const maskedKey = `${existingApiKey.substring(0, 8)}****${existingApiKey.slice(-4)}`;
       setApiKey(maskedKey);
-      setKeyStatus('valid'); // Assume existing key is valid
+      setSurveyId(existingSurveyId || "");
+      setKeyStatus('valid'); // Assume existing credentials are valid
     } else if (open) {
       setApiKey("");
+      setSurveyId("");
       setKeyStatus('unknown');
     }
-  }, [open, existingApiKey]);
+  }, [open, existingApiKey, existingSurveyId]);
 
   const validateApiKeyFormat = (key: string): boolean => {
     const trimmedKey = key.trim();
@@ -54,11 +65,18 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
     return true;
   };
 
-  const testApiKey = async (keyToTest: string) => {
-    if (!keyToTest.trim() || keyToTest.includes('****')) {
+  const validateSurveyIdFormat = (id: string): boolean => {
+    const trimmedId = id.trim();
+    // Check if it's a valid UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(trimmedId);
+  };
+
+  const testApiCredentials = async (keyToTest: string, surveyIdToTest: string) => {
+    if (!keyToTest.trim() || keyToTest.includes('****') || !surveyIdToTest.trim()) {
       toast({
-        title: "Invalid Key",
-        description: "Please enter a valid API key to test",
+        title: "Invalid Credentials",
+        description: "Please enter both a valid API key and Survey ID to test",
         variant: "destructive"
       });
       return false;
@@ -74,15 +92,29 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
       return false;
     }
 
+    // Validate Survey ID format
+    if (!validateSurveyIdFormat(surveyIdToTest)) {
+      toast({
+        title: "Invalid Survey ID Format",
+        description: "Survey ID should be a valid UUID format (e.g., 9b1c6ac8-7a09-4432-b91c-52f49efc46b4)",
+        variant: "destructive"
+      });
+      return false;
+    }
+
     try {
       setTesting(true);
-      console.log('Testing API key:', keyToTest.substring(0, 8) + '****' + keyToTest.slice(-4));
+      console.log('Testing API credentials:', {
+        apiKey: keyToTest.substring(0, 8) + '****' + keyToTest.slice(-4),
+        surveyId: surveyIdToTest
+      });
       
-      // Test the API key by making a simple request
-      const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas', {
+      // Test the API credentials by making a request to the specific survey endpoint
+      const response = await fetch(`https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/get-saved-quota/${surveyIdToTest.trim()}`, {
         method: 'GET',
         headers: {
-          'x-api-key': keyToTest.trim()
+          'x-api-key': keyToTest.trim(),
+          'Content-Type': 'application/json'
         }
       });
 
@@ -91,15 +123,23 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
       if (response.ok) {
         setKeyStatus('valid');
         toast({
-          title: "API Key Valid",
-          description: "Your API key is working correctly",
+          title: "API Credentials Valid",
+          description: "Your API key and Survey ID are working correctly",
         });
         return true;
       } else if (response.status === 401 || response.status === 403) {
         setKeyStatus('invalid');
         toast({
-          title: "API Key Invalid",
-          description: "The API key is not valid or has been rejected",
+          title: "API Credentials Invalid",
+          description: "The API key or Survey ID is not valid or has been rejected",
+          variant: "destructive"
+        });
+        return false;
+      } else if (response.status === 404) {
+        setKeyStatus('invalid');
+        toast({
+          title: "Survey Not Found",
+          description: "The Survey ID was not found. Please check that the Survey ID is correct.",
           variant: "destructive"
         });
         return false;
@@ -107,7 +147,7 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
         throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      console.error('API key test error:', error);
+      console.error('API credentials test error:', error);
       
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
         setKeyStatus('invalid');
@@ -119,8 +159,8 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
       } else {
         setKeyStatus('invalid');
         toast({
-          title: "API Key Test Failed",
-          description: "Could not validate the API key. Please check your connection and try again.",
+          title: "API Credentials Test Failed",
+          description: "Could not validate the API credentials. Please check your connection and try again.",
           variant: "destructive"
         });
       }
@@ -131,20 +171,20 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
   };
 
   const handleTest = () => {
-    testApiKey(apiKey);
+    testApiCredentials(apiKey, surveyId);
   };
 
   const handleSave = async () => {
-    if (!apiKey.trim() || apiKey.includes('****')) {
+    if (!apiKey.trim() || apiKey.includes('****') || !surveyId.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please enter a valid Quota Generator API key",
+        description: "Please enter both a valid Quota Generator API key and Survey ID",
         variant: "destructive"
       });
       return;
     }
 
-    // Validate API key format before saving
+    // Validate formats before saving
     if (!validateApiKeyFormat(apiKey)) {
       toast({
         title: "Invalid API Key Format",
@@ -154,29 +194,43 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
       return;
     }
 
+    if (!validateSurveyIdFormat(surveyId)) {
+      toast({
+        title: "Invalid Survey ID Format",
+        description: "Survey ID should be a valid UUID format",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       const cleanApiKey = apiKey.trim();
+      const cleanSurveyId = surveyId.trim();
       
-      console.log('Saving API key:', cleanApiKey.substring(0, 8) + '****' + cleanApiKey.slice(-4));
+      console.log('Saving API credentials:', {
+        apiKey: cleanApiKey.substring(0, 8) + '****' + cleanApiKey.slice(-4),
+        surveyId: cleanSurveyId
+      });
       
-      // Test the key first
-      const isValid = await testApiKey(cleanApiKey);
+      // Test the credentials first
+      const isValid = await testApiCredentials(cleanApiKey, cleanSurveyId);
       if (!isValid) {
         return;
       }
 
-      // Save the API key
-      const savedCredentials = await ApiService.saveQuotaGeneratorCredentials(cleanApiKey);
-      console.log('API key saved successfully:', savedCredentials);
+      // Save the enhanced API credentials with both API key and Survey ID
+      const savedCredentials = await ApiService.saveQuotaGeneratorCredentials(cleanApiKey, cleanSurveyId);
+      console.log('API credentials saved successfully:', savedCredentials);
       
       toast({
-        title: "API Key Saved",
-        description: "Your Quota Generator API key has been saved successfully",
+        title: "API Credentials Saved",
+        description: "Your Quota Generator API key and Survey ID have been saved successfully",
       });
       
-      // Clear the input and trigger parent refresh
+      // Clear the inputs and trigger parent refresh
       setApiKey("");
+      setSurveyId("");
       setKeyStatus('valid');
       
       // Close dialog and notify parent
@@ -189,10 +243,10 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
       }, 100);
       
     } catch (error) {
-      console.error('Error saving API key:', error);
+      console.error('Error saving API credentials:', error);
       toast({
         title: "Save Error",
-        description: error instanceof Error ? error.message : "Failed to save API key",
+        description: error instanceof Error ? error.message : "Failed to save API credentials",
         variant: "destructive"
       });
     } finally {
@@ -200,7 +254,7 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setApiKey(newValue);
     setKeyStatus('unknown');
@@ -209,6 +263,14 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
     if (newValue.trim() && !newValue.includes('****')) {
       console.log('API key input changed, clearing validation state');
     }
+  };
+
+  const handleSurveyIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setSurveyId(newValue);
+    setKeyStatus('unknown');
+    
+    console.log('Survey ID input changed, clearing validation state');
   };
 
   const getStatusIcon = () => {
@@ -225,9 +287,9 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
   const getStatusText = () => {
     switch (keyStatus) {
       case 'valid':
-        return <span className="text-sm text-green-600">API key is valid</span>;
+        return <span className="text-sm text-green-600">API credentials are valid</span>;
       case 'invalid':
-        return <span className="text-sm text-red-600">API key is invalid</span>;
+        return <span className="text-sm text-red-600">API credentials are invalid</span>;
       default:
         return null;
     }
@@ -239,12 +301,12 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
         <DialogHeader>
           <DialogTitle className="flex items-center">
             <Key className="h-5 w-5 mr-2 text-blue-600" />
-            {existingApiKey ? "Edit Quota Generator API Key" : "Configure Quota Generator API"}
+            {existingApiKey ? "Edit Quota Generator API Credentials" : "Configure Quota Generator API"}
           </DialogTitle>
           <DialogDescription>
             {existingApiKey 
-              ? "Update your Quota Generator API key to continue accessing saved quotas and demographic targeting"
-              : "Enter your Quota Generator API key to access saved quotas and generate detailed demographic targeting"
+              ? "Update your Quota Generator API credentials to continue accessing saved quotas and demographic targeting"
+              : "Enter your Quota Generator API key and Survey ID to access saved quotas and generate detailed demographic targeting"
             }
           </DialogDescription>
         </DialogHeader>
@@ -259,25 +321,44 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
               type="password"
               placeholder="qwa_your_api_key_here"
               value={apiKey}
-              onChange={handleInputChange}
+              onChange={handleApiKeyChange}
             />
-            {getStatusText()}
-            <div className="text-sm text-slate-600 flex items-center">
-              <ExternalLink className="h-3 w-3 mr-1" />
-              Get your API key from the Quota Generator dashboard
-            </div>
             <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded">
-              <strong>Note:</strong> Paste only the API key (starting with "qwa_"), not curl commands or examples
+              <strong>API Key:</strong> Paste only the API key (starting with "qwa_"), not curl commands or examples
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="surveyId">Survey ID</Label>
+            <Input
+              id="surveyId"
+              type="text"
+              placeholder="9b1c6ac8-7a09-4432-b91c-52f49efc46b4"
+              value={surveyId}
+              onChange={handleSurveyIdChange}
+            />
+            <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded">
+              <strong>Survey ID:</strong> The UUID identifier for your specific survey/quota project
+            </div>
+          </div>
+
+          {getStatusText()}
           
-          {existingApiKey && (
+          <div className="text-sm text-slate-600 flex items-center">
+            <ExternalLink className="h-3 w-3 mr-1" />
+            Get your API key and Survey ID from the Quota Generator dashboard
+          </div>
+          
+          {(existingApiKey || existingSurveyId) && (
             <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
               <p className="text-sm text-blue-800">
-                Current API key: {existingApiKey.substring(0, 8)}****{existingApiKey.slice(-4)}
+                Current API key: {existingApiKey ? `${existingApiKey.substring(0, 8)}****${existingApiKey.slice(-4)}` : 'Not set'}
+              </p>
+              <p className="text-sm text-blue-800">
+                Current Survey ID: {existingSurveyId || 'Not set'}
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                Enter a new key above to replace the current one
+                Enter new credentials above to replace the current ones
               </p>
             </div>
           )}
@@ -289,7 +370,7 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
           <Button 
             variant="outline" 
             onClick={handleTest} 
-            disabled={testing || !apiKey.trim() || apiKey.includes('****')}
+            disabled={testing || !apiKey.trim() || apiKey.includes('****') || !surveyId.trim()}
           >
             {testing ? (
               <>
@@ -297,11 +378,11 @@ const QuotaGeneratorApiKeyDialog = ({ open, onOpenChange, onApiKeySet, existingA
                 Testing...
               </>
             ) : (
-              "Test Key"
+              "Test Credentials"
             )}
           </Button>
           <Button onClick={handleSave} disabled={loading || keyStatus === 'invalid'}>
-            {loading ? "Saving..." : "Save API Key"}
+            {loading ? "Saving..." : "Save Credentials"}
           </Button>
         </DialogFooter>
       </DialogContent>

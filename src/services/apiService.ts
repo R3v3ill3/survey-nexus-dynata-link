@@ -595,13 +595,6 @@ export class ApiService {
       throw new Error('User not authenticated');
     }
 
-    // Deactivate any existing quota generator credentials
-    await supabase
-      .from('api_credentials')
-      .update({ is_active: false })
-      .eq('user_id', user.id)
-      .eq('provider', 'quota_generator');
-
     // Create enhanced credentials object
     const credentials = surveyId ? 
       { api_key: apiKey, survey_id: surveyId } : 
@@ -612,13 +605,16 @@ export class ApiService {
       api_key: apiKey.substring(0, 8) + '****' + apiKey.slice(-4) 
     });
 
+    // Use UPSERT to handle existing records
     const { data, error } = await supabase
       .from('api_credentials')
-      .insert({
+      .upsert({
         user_id: user.id,
         provider: 'quota_generator',
         credentials,
         is_active: true
+      }, {
+        onConflict: 'user_id,provider'
       })
       .select()
       .single();

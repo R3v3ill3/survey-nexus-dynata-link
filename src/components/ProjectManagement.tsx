@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, FolderOpen, Play, Pause, Square, MoreHorizontal, Calendar, Users } from "lucide-react";
+import { Plus, FolderOpen, Play, Pause, Square, MoreHorizontal, Calendar, Users, Cloud, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ApiService } from "@/services/apiService";
 import { Project } from "@/types/database";
@@ -24,6 +24,7 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [localMode, setLocalMode] = useState(true);
   const [newProject, setNewProject] = useState({
     title: "",
     description: "",
@@ -33,23 +34,39 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadProjects();
-    }
-  }, [isAuthenticated]);
+    loadProjects();
+  }, []);
 
   const loadProjects = async () => {
     try {
       setLoading(true);
-      const projectsData = await ApiService.getProjects();
-      setProjects(projectsData);
+      if (localMode || !isAuthenticated) {
+        // Load projects from local database
+        const projectsData = await ApiService.getLocalProjects();
+        setProjects(projectsData);
+      } else {
+        // Load projects from Dynata API
+        const projectsData = await ApiService.getProjects();
+        setProjects(projectsData);
+      }
     } catch (error) {
       console.error('Error loading projects:', error);
       toast({
-        title: "Error",
-        description: "Failed to load projects",
-        variant: "destructive"
+        title: "Info",
+        description: localMode ? "Loading local projects" : "Failed to load projects",
+        variant: localMode ? "default" : "destructive"
       });
+      
+      // Fallback to local projects if Dynata fails
+      if (!localMode) {
+        try {
+          const localProjectsData = await ApiService.getLocalProjects();
+          setProjects(localProjectsData);
+          setLocalMode(true);
+        } catch (localError) {
+          console.error('Error loading local projects:', localError);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -67,11 +84,23 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
 
     try {
       setLoading(true);
-      const project = await ApiService.createProject(
-        newProject.title,
-        newProject.description,
-        { targetResponses: parseInt(newProject.targetResponses) || 1000 }
-      );
+      let project;
+
+      if (localMode || !isAuthenticated) {
+        // Create local project
+        project = await ApiService.createLocalProject(
+          newProject.title,
+          newProject.description,
+          { targetResponses: parseInt(newProject.targetResponses) || 1000 }
+        );
+      } else {
+        // Create project via Dynata API
+        project = await ApiService.createProject(
+          newProject.title,
+          newProject.description,
+          { targetResponses: parseInt(newProject.targetResponses) || 1000 }
+        );
+      }
 
       setProjects(prev => [...prev, project]);
       setNewProject({ title: "", description: "", targetResponses: "" });
@@ -79,7 +108,7 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
 
       toast({
         title: "Project Created",
-        description: `Successfully created project: ${project.title}`,
+        description: `Successfully created ${localMode ? 'local' : 'Dynata'} project: ${project.title}`,
       });
     } catch (error) {
       console.error('Error creating project:', error);
@@ -95,10 +124,16 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
 
   const handleStatusChange = async (projectId: string, newStatus: string) => {
     try {
-      if (newStatus === 'active') {
-        await ApiService.launchProject(projectId);
+      if (localMode || !isAuthenticated) {
+        // Update local project status
+        await ApiService.updateLocalProjectStatus(projectId, newStatus);
       } else {
-        await ApiService.updateProjectStatus(projectId, newStatus);
+        // Update via Dynata API
+        if (newStatus === 'active') {
+          await ApiService.launchProject(projectId);
+        } else {
+          await ApiService.updateProjectStatus(projectId, newStatus);
+        }
       }
 
       setProjects(prev => 
@@ -120,6 +155,33 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
         description: "Failed to update project status",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleSyncToDynata = async (projectId: string) => {
+    try {
+      setLoading(true);
+      const syncedProject = await ApiService.syncProjectToDynata(projectId);
+      
+      setProjects(prev => 
+        prev.map(project => 
+          project.id === projectId ? syncedProject : project
+        )
+      );
+
+      toast({
+        title: "Project Synced",
+        description: "Project successfully synced to Dynata",
+      });
+    } catch (error) {
+      console.error('Error syncing project to Dynata:', error);
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync project to Dynata. Check API credentials.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -166,60 +228,75 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
                 Create and manage survey projects across Dynata, SMS, and Voice channels
               </CardDescription>
             </div>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button disabled={loading}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Project
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[525px]">
-                <DialogHeader>
-                  <DialogTitle>Create New Multi-Modal Project</DialogTitle>
-                  <DialogDescription>
-                    Set up a new survey project that can be deployed across multiple channels
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Project Title *</Label>
-                    <Input
-                      id="title"
-                      placeholder="Enter project title"
-                      value={newProject.title}
-                      onChange={(e) => setNewProject(prev => ({ ...prev, title: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description *</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Describe the survey objectives and methodology"
-                      value={newProject.description}
-                      onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="target">Target Responses</Label>
-                    <Input
-                      id="target"
-                      type="number"
-                      placeholder="1000"
-                      value={newProject.targetResponses}
-                      onChange={(e) => setNewProject(prev => ({ ...prev, targetResponses: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Database className="h-4 w-4 text-slate-500" />
+                <Label htmlFor="local-mode" className="text-sm">Local Mode</Label>
+                <Switch
+                  id="local-mode"
+                  checked={localMode}
+                  onCheckedChange={setLocalMode}
+                />
+                <Cloud className="h-4 w-4 text-slate-500" />
+              </div>
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button disabled={loading}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Project
                   </Button>
-                  <Button onClick={handleCreateProject} disabled={loading}>
-                    Create Project
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[525px]">
+                  <DialogHeader>
+                    <DialogTitle>
+                      Create New {localMode ? 'Local' : 'Dynata'} Project
+                    </DialogTitle>
+                    <DialogDescription>
+                      Set up a new survey project that can be deployed across multiple channels
+                      {localMode && " (Local mode - will be stored locally until synced to Dynata)"}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Project Title *</Label>
+                      <Input
+                        id="title"
+                        placeholder="Enter project title"
+                        value={newProject.title}
+                        onChange={(e) => setNewProject(prev => ({ ...prev, title: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description *</Label>
+                      <Textarea
+                        id="description"
+                        placeholder="Describe the survey objectives and methodology"
+                        value={newProject.description}
+                        onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="target">Target Responses</Label>
+                      <Input
+                        id="target"
+                        type="number"
+                        placeholder="1000"
+                        value={newProject.targetResponses}
+                        onChange={(e) => setNewProject(prev => ({ ...prev, targetResponses: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCreateProject} disabled={loading}>
+                      Create {localMode ? 'Local' : 'Dynata'} Project
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -231,9 +308,9 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
                 <TableRow>
                   <TableHead>Project</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -250,6 +327,18 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
                       <Badge className={getStatusColor(project.status)}>
                         {project.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-1">
+                        {project.external_id ? (
+                          <Cloud className="h-4 w-4 text-blue-500" />
+                        ) : (
+                          <Database className="h-4 w-4 text-slate-500" />
+                        )}
+                        <span className="text-sm">
+                          {project.external_id ? 'Dynata' : 'Local'}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
@@ -275,12 +364,17 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-slate-600">
-                        {new Date(project.updated_at).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
                       <div className="flex items-center space-x-2">
+                        {!project.external_id && isAuthenticated && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleSyncToDynata(project.id)}
+                            disabled={loading}
+                          >
+                            <Cloud className="h-4 w-4" />
+                          </Button>
+                        )}
                         {project.status === "draft" && (
                           <Button size="sm" onClick={() => handleStatusChange(project.id, "active")} disabled={loading}>
                             <Play className="h-4 w-4" />
@@ -289,11 +383,6 @@ const ProjectManagement = ({ isAuthenticated, activeProject, setActiveProject }:
                         {project.status === "active" && (
                           <Button size="sm" variant="outline" onClick={() => handleStatusChange(project.id, "paused")} disabled={loading}>
                             <Pause className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {(project.status === "active" || project.status === "paused") && (
-                          <Button size="sm" variant="outline" onClick={() => handleStatusChange(project.id, "completed")} disabled={loading}>
-                            <Square className="h-4 w-4" />
                           </Button>
                         )}
                         <Button 

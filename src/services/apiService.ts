@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Project, 
@@ -18,6 +17,91 @@ import {
 } from "@/types/database";
 
 export class ApiService {
+  // Local Project Management (Phase 1)
+  static async createLocalProject(title: string, description: string, settings: Record<string, any> = {}) {
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({
+        title,
+        description,
+        settings,
+        status: 'draft',
+        user_id: 'local-user', // Temporary user ID for local mode
+        external_id: null // No external ID for local projects
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as Project;
+  }
+
+  static async getLocalProjects() {
+    const { data, error } = await supabase
+      .from('projects')
+      .select(`
+        *,
+        line_items(*)
+      `)
+      .is('external_id', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data as Project[];
+  }
+
+  static async updateLocalProjectStatus(projectId: string, status: string) {
+    const { data, error } = await supabase
+      .from('projects')
+      .update({ 
+        status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', projectId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async syncProjectToDynata(projectId: string) {
+    // Get local project
+    const { data: localProject, error: fetchError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    try {
+      // Create project via Dynata API
+      const dynataProject = await this.createProject(
+        localProject.title,
+        localProject.description,
+        localProject.settings
+      );
+
+      // Update local project with external ID
+      const { data, error } = await supabase
+        .from('projects')
+        .update({ 
+          external_id: dynataProject.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', projectId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Project;
+    } catch (error) {
+      console.error('Failed to sync project to Dynata:', error);
+      throw new Error('Failed to sync to Dynata. Please check your API credentials.');
+    }
+  }
+
   // Dynata Authentication
   static async authenticateWithDynata(username: string, password: string) {
     const { data, error } = await supabase.functions.invoke('dynata-auth', {

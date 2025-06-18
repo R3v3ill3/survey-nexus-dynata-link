@@ -654,7 +654,7 @@ export class ApiService {
       }
       
       const { data, error } = await supabase.functions.invoke('generate-quotas', {
-        body: JSON.stringify(config),
+        body: JSON.stingify(config),
         headers
       });
 

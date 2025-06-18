@@ -13,6 +13,12 @@ import { Settings, Database, Zap } from "lucide-react";
 import QuotaGeneratorApiKeyDialog from "./QuotaGeneratorApiKeyDialog";
 import SavedQuotasDialog from "./SavedQuotasDialog";
 
+// Type for API credentials
+interface ApiCredentials {
+  api_key: string;
+  [key: string]: any;
+}
+
 interface CreateQuotaConfigDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,7 +50,12 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
   const checkApiKeyStatus = async () => {
     try {
       const credentials = await ApiService.checkQuotaGeneratorCredentials();
-      setHasApiKey(!!credentials?.credentials?.api_key);
+      if (credentials?.credentials) {
+        const creds = credentials.credentials as ApiCredentials;
+        setHasApiKey(!!creds.api_key);
+      } else {
+        setHasApiKey(false);
+      }
     } catch (error) {
       setHasApiKey(false);
     }

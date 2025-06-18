@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Project, 
@@ -18,6 +17,12 @@ import {
   ProjectStatus,
   LineItemStatus
 } from "@/types/database";
+
+// Type for API credentials
+interface ApiCredentials {
+  api_key: string;
+  [key: string]: any;
+}
 
 export class ApiService {
   // Local Project Management (Phase 1)
@@ -602,15 +607,20 @@ export class ApiService {
     additionalParams?: Record<string, any>;
   }) {
     const credentials = await this.checkQuotaGeneratorCredentials();
-    if (!credentials?.credentials?.api_key) {
+    if (!credentials?.credentials) {
       throw new Error('Quota Generator API key not configured');
+    }
+
+    const creds = credentials.credentials as ApiCredentials;
+    if (!creds.api_key) {
+      throw new Error('Quota Generator API key not found in credentials');
     }
 
     const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/calculate-quotas', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': credentials.credentials.api_key
+        'x-api-key': creds.api_key
       },
       body: JSON.stringify({
         geography: parameters.geography,
@@ -630,14 +640,19 @@ export class ApiService {
 
   static async listSavedQuotas() {
     const credentials = await this.checkQuotaGeneratorCredentials();
-    if (!credentials?.credentials?.api_key) {
+    if (!credentials?.credentials) {
       throw new Error('Quota Generator API key not configured');
+    }
+
+    const creds = credentials.credentials as ApiCredentials;
+    if (!creds.api_key) {
+      throw new Error('Quota Generator API key not found in credentials');
     }
 
     const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas', {
       method: 'GET',
       headers: {
-        'x-api-key': credentials.credentials.api_key
+        'x-api-key': creds.api_key
       }
     });
 
@@ -650,14 +665,19 @@ export class ApiService {
 
   static async getSavedQuota(quotaId: string) {
     const credentials = await this.checkQuotaGeneratorCredentials();
-    if (!credentials?.credentials?.api_key) {
+    if (!credentials?.credentials) {
       throw new Error('Quota Generator API key not configured');
+    }
+
+    const creds = credentials.credentials as ApiCredentials;
+    if (!creds.api_key) {
+      throw new Error('Quota Generator API key not found in credentials');
     }
 
     const response = await fetch(`https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/get-saved-quota/${quotaId}`, {
       method: 'GET',
       headers: {
-        'x-api-key': credentials.credentials.api_key
+        'x-api-key': creds.api_key
       }
     });
 

@@ -5,14 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Users, MessageSquare, Mic, Globe, Plus, Settings, Activity } from "lucide-react";
+import { BarChart3, Users, MessageSquare, Mic, Globe, Plus, Settings, Activity, LogOut } from "lucide-react";
 import ProjectManagement from "@/components/ProjectManagement";
 import AuthenticationModule from "@/components/AuthenticationModule";
 import ResponseCollection from "@/components/ResponseCollection";
 import QuotaManagement from "@/components/QuotaManagement";
 import { ApiService } from "@/services/apiService";
+import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
+  const { user, signOut } = useAuth();
   const [activeProject, setActiveProject] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [projectMetrics, setProjectMetrics] = useState({
@@ -30,13 +32,15 @@ const Index = () => {
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [user]);
 
   const loadDashboardData = async () => {
+    if (!user) return;
+    
     try {
       setIsLoading(true);
       
-      // Get local projects
+      // Get user's projects
       const projects = await ApiService.getLocalProjects();
       const totalProjects = projects.length;
       const activeProjects = projects.filter(p => p.status === 'active').length;
@@ -77,6 +81,10 @@ const Index = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
@@ -89,16 +97,20 @@ const Index = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">Multi-Modal Polling Platform</h1>
-                <p className="text-slate-600">Dynata Integration Dashboard</p>
+                <p className="text-slate-600">Welcome back, {user?.email}</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <Badge variant={isAuthenticated ? "default" : "destructive"}>
-                {isAuthenticated ? "Connected" : "Disconnected"}
+              <Badge variant={isAuthenticated ? "default" : "secondary"}>
+                {isAuthenticated ? "Connected to Dynata" : "Local Mode"}
               </Badge>
               <Button variant="outline" size="sm">
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
               </Button>
             </div>
           </div>

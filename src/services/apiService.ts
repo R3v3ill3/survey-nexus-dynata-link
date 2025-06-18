@@ -20,6 +20,10 @@ import {
 export class ApiService {
   // Local Project Management (Phase 1)
   static async createLocalProject(title: string, description: string, settings: Record<string, any> = {}) {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Authentication required');
+
     const { data, error } = await supabase
       .from('projects')
       .insert({
@@ -27,7 +31,7 @@ export class ApiService {
         description,
         settings,
         status: 'draft',
-        user_id: 'local-user', // Temporary user ID for local mode
+        user_id: user.id, // Use authenticated user ID
         external_id: null // No external ID for local projects
       })
       .select()
@@ -38,13 +42,17 @@ export class ApiService {
   }
 
   static async getLocalProjects() {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Authentication required');
+
     const { data, error } = await supabase
       .from('projects')
       .select(`
         *,
         line_items(*)
       `)
-      .is('external_id', null)
+      .eq('user_id', user.id) // Filter by authenticated user
       .order('created_at', { ascending: false });
 
     if (error) throw error;

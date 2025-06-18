@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ApiService } from "@/services/apiService";
 import { GeographyScope, QuotaMode } from "@/types/database";
-import { Settings, Database, Zap } from "lucide-react";
+import { Settings, Database, Zap, Check, AlertTriangle, Edit, Key } from "lucide-react";
 import QuotaGeneratorApiKeyDialog from "./QuotaGeneratorApiKeyDialog";
 import SavedQuotasDialog from "./SavedQuotasDialog";
 
@@ -29,6 +29,8 @@ interface CreateQuotaConfigDialogProps {
 const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: CreateQuotaConfigDialogProps) => {
   const [activeTab, setActiveTab] = useState("generate");
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [apiKeyStatus, setApiKeyStatus] = useState<'valid' | 'invalid' | 'not_set'>('not_set');
+  const [currentApiKey, setCurrentApiKey] = useState<string>("");
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [showSavedQuotasDialog, setShowSavedQuotasDialog] = useState(false);
   const { toast } = useToast();
@@ -52,17 +54,58 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
       const credentials = await ApiService.checkQuotaGeneratorCredentials();
       if (credentials?.credentials) {
         const creds = credentials.credentials as ApiCredentials;
-        setHasApiKey(!!creds.api_key);
+        if (creds.api_key) {
+          setHasApiKey(true);
+          setCurrentApiKey(creds.api_key);
+          setApiKeyStatus('valid');
+        } else {
+          setHasApiKey(false);
+          setApiKeyStatus('not_set');
+        }
       } else {
         setHasApiKey(false);
+        setApiKeyStatus('not_set');
       }
     } catch (error) {
       setHasApiKey(false);
+      setApiKeyStatus('not_set');
+    }
+  };
+
+  const handleApiError = (error: any) => {
+    console.error('API Error:', error);
+    
+    // Check if it's an authentication error
+    if (error.message?.includes('401') || error.message?.includes('403') || 
+        error.message?.includes('API key') || error.message?.includes('authentication')) {
+      setApiKeyStatus('invalid');
+      toast({
+        title: "API Key Invalid",
+        description: "Your API key has been rejected. Please update your credentials.",
+        variant: "destructive",
+        action: (
+          <Button variant="outline" size="sm" onClick={() => setShowApiKeyDialog(true)}>
+            Update Key
+          </Button>
+        )
+      });
+    } else if (error.message?.includes('CORS') || error.message?.includes('Failed to fetch')) {
+      toast({
+        title: "Connection Error",
+        description: "Unable to connect to the Quota Generator API. This may be a temporary issue.",
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "API Error",
+        description: error.message || "Failed to generate quotas from API. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
   const handleGenerateWithAPI = async () => {
-    if (!hasApiKey) {
+    if (!hasApiKey || apiKeyStatus !== 'valid') {
       setShowApiKeyDialog(true);
       return;
     }
@@ -81,12 +124,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
         apiResponse
       });
     } catch (error) {
-      console.error('Error generating quotas from API:', error);
-      toast({
-        title: "API Error",
-        description: "Failed to generate quotas from API. Please check your configuration.",
-        variant: "destructive"
-      });
+      handleApiError(error);
     }
   };
 
@@ -106,6 +144,58 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
       useApi: true,
       savedQuota: savedQuota
     });
+  };
+
+  const getApiKeyStatusDisplay = () => {
+    switch (apiKeyStatus) {
+      case 'valid':
+        return (
+          <div className="flex items-center text-green-600 text-sm">
+            <Check className="h-4 w-4 mr-1" />
+            API key configured and valid
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="ml-2 h-6 px-2" 
+              onClick={() => setShowApiKeyDialog(true)}
+            >
+              <Edit className="h-3 w-3 mr-1" />
+              Edit
+            </Button>
+          </div>
+        );
+      case 'invalid':
+        return (
+          <div className="flex items-center text-red-600 text-sm">
+            <AlertTriangle className="h-4 w-4 mr-1" />
+            API key invalid or rejected
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="ml-2 h-6 px-2" 
+              onClick={() => setShowApiKeyDialog(true)}
+            >
+              <Edit className="h-3 w-3 mr-1" />
+              Fix
+            </Button>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center text-slate-600 text-sm">
+            <Key className="h-4 w-4 mr-1" />
+            No API key configured
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="ml-2 h-6 px-2" 
+              onClick={() => setShowApiKeyDialog(true)}
+            >
+              Configure
+            </Button>
+          </div>
+        );
+    }
   };
 
   return (
@@ -138,6 +228,14 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
             <TabsContent value="generate" className="space-y-4">
               <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
                 Generate sophisticated quota structures using the Quota Generator API with real Australian demographic data
+              </div>
+
+              {/* API Key Status Display */}
+              <div className="bg-slate-50 p-3 rounded-lg border">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-700">API Configuration</span>
+                  {getApiKeyStatusDisplay()}
+                </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
@@ -203,17 +301,6 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
                   />
                 </div>
               </div>
-
-              {!hasApiKey && (
-                <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    API key required for advanced quota generation. 
-                    <Button variant="link" className="p-0 h-auto text-yellow-800" onClick={() => setShowApiKeyDialog(true)}>
-                      Configure API key
-                    </Button>
-                  </p>
-                </div>
-              )}
             </TabsContent>
 
             <TabsContent value="saved" className="space-y-4">
@@ -225,10 +312,15 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
                 </p>
                 <Button 
                   onClick={() => setShowSavedQuotasDialog(true)}
-                  disabled={!hasApiKey}
+                  disabled={apiKeyStatus !== 'valid'}
                 >
-                  {hasApiKey ? "Browse Saved Quotas" : "API Key Required"}
+                  {apiKeyStatus === 'valid' ? "Browse Saved Quotas" : "API Key Required"}
                 </Button>
+                {apiKeyStatus !== 'valid' && (
+                  <div className="mt-3">
+                    {getApiKeyStatusDisplay()}
+                  </div>
+                )}
               </div>
             </TabsContent>
 
@@ -272,7 +364,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
               Cancel
             </Button>
             {activeTab === "generate" ? (
-              <Button onClick={handleGenerateWithAPI} disabled={loading || !hasApiKey}>
+              <Button onClick={handleGenerateWithAPI} disabled={loading || apiKeyStatus !== 'valid'}>
                 {loading ? "Generating..." : "Generate with API"}
               </Button>
             ) : activeTab === "local" ? (
@@ -289,8 +381,10 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
         onOpenChange={setShowApiKeyDialog}
         onApiKeySet={() => {
           setHasApiKey(true);
+          setApiKeyStatus('valid');
           checkApiKeyStatus();
         }}
+        existingApiKey={currentApiKey}
       />
 
       <SavedQuotasDialog

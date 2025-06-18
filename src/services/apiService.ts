@@ -616,26 +616,44 @@ export class ApiService {
       throw new Error('Quota Generator API key not found in credentials');
     }
 
-    const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/calculate-quotas', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': creds.api_key
-      },
-      body: JSON.stringify({
-        geography: parameters.geography,
-        geographyDetail: parameters.geographyDetail,
-        quotaMode: parameters.quotaMode,
-        sampleSize: parameters.sampleSize,
-        ...parameters.additionalParams
-      })
-    });
+    try {
+      const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/calculate-quotas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': creds.api_key
+        },
+        body: JSON.stringify({
+          geography: parameters.geography,
+          geographyDetail: parameters.geographyDetail,
+          quotaMode: parameters.quotaMode,
+          sampleSize: parameters.sampleSize,
+          ...parameters.additionalParams
+        })
+      });
 
-    if (!response.ok) {
-      throw new Error(`Quota Generator API error: ${response.statusText}`);
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('API authentication failed (401). Please check your API key.');
+        } else if (response.status === 403) {
+          throw new Error('API access forbidden (403). Your API key may not have the required permissions.');
+        } else if (response.status === 429) {
+          throw new Error('API rate limit exceeded (429). Please try again later.');
+        } else {
+          throw new Error(`Quota Generator API error (${response.status}): ${response.statusText}`);
+        }
+      }
+
+      return await response.json();
+    } catch (error) {
+      // Handle network errors specifically
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error('Network error: Unable to connect to the Quota Generator API. Please check your internet connection or try again later.');
+      }
+      
+      // Re-throw other errors as-is
+      throw error;
     }
-
-    return await response.json();
   }
 
   static async listSavedQuotas() {
@@ -649,18 +667,28 @@ export class ApiService {
       throw new Error('Quota Generator API key not found in credentials');
     }
 
-    const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas', {
-      method: 'GET',
-      headers: {
-        'x-api-key': creds.api_key
+    try {
+      const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas', {
+        method: 'GET',
+        headers: {
+          'x-api-key': creds.api_key
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('API authentication failed. Please check your API key.');
+        }
+        throw new Error(`Quota Generator API error: ${response.statusText}`);
       }
-    });
 
-    if (!response.ok) {
-      throw new Error(`Quota Generator API error: ${response.statusText}`);
+      return await response.json();
+    } catch (error) {
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error('Network error: Unable to connect to the Quota Generator API.');
+      }
+      throw error;
     }
-
-    return await response.json();
   }
 
   static async getSavedQuota(quotaId: string) {
@@ -674,21 +702,31 @@ export class ApiService {
       throw new Error('Quota Generator API key not found in credentials');
     }
 
-    const response = await fetch(`https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/get-saved-quota/${quotaId}`, {
-      method: 'GET',
-      headers: {
-        'x-api-key': creds.api_key
+    try {
+      const response = await fetch(`https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/get-saved-quota/${quotaId}`, {
+        method: 'GET',
+        headers: {
+          'x-api-key': creds.api_key
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('API authentication failed. Please check your API key.');
+        }
+        throw new Error(`Quota Generator API error: ${response.statusText}`);
       }
-    });
 
-    if (!response.ok) {
-      throw new Error(`Quota Generator API error: ${response.statusText}`);
+      return await response.json();
+    } catch (error) {
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error('Network error: Unable to connect to the Quota Generator API.');
+      }
+      throw error;
     }
-
-    return await response.json();
   }
 
-  // Enhanced quota processing from API
+  // Enhanced quota processing from API with better error handling
   static async processQuotaGeneratorAPIResponse(
     projectId: string,
     apiResponse: any
@@ -729,5 +767,22 @@ export class ApiService {
       segments: [],
       apiResponse
     };
+  }
+
+  // New method to test API key validity
+  static async testQuotaGeneratorApiKey(apiKey: string): Promise<boolean> {
+    try {
+      const response = await fetch('https://aomwplugkkqtxuhdzufc.supabase.co/functions/v1/list-saved-quotas', {
+        method: 'GET',
+        headers: {
+          'x-api-key': apiKey
+        }
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Error testing API key:', error);
+      return false;
+    }
   }
 }

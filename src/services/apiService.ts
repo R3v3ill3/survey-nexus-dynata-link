@@ -731,7 +731,8 @@ export class ApiService {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke(`get-saved-quota/${quotaId}`, {
+      const { data, error } = await supabase.functions.invoke(`get-saved-quota`, {
+        body: { quotaId },
         headers: {
           'x-api-key': creds.api_key
         }

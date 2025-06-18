@@ -430,7 +430,7 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
       <SavedQuotasDialog
         open={showSavedQuotasDialog}
         onOpenChange={setShowSavedQuotasDialog}
-        onQuotaSelect={handleSavedQuotaSelect}
+        onQuotaSelected={handleSavedQuotaSelect}
       />
     </>
   );

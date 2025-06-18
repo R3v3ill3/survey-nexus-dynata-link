@@ -144,17 +144,55 @@ export class ApiService {
     if (error) throw error;
     if (!data) return null;
 
-    // Type cast the data to match our interfaces
-    return {
-      ...data,
+    // Transform the data to match our interfaces
+    const transformedData: QuotaConfiguration = {
+      id: data.id,
+      project_id: data.project_id,
       geography_scope: data.geography_scope as GeographyScope,
+      geography_detail: data.geography_detail,
       quota_mode: data.quota_mode as QuotaMode,
+      total_quotas: data.total_quotas,
+      sample_size_multiplier: data.sample_size_multiplier,
       complexity_level: data.complexity_level as ComplexityLevel,
-      segments: data.segments?.map(segment => ({
-        ...segment,
-        category: segment.category as QuotaCategory
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      segments: data.segments?.map((segment: any) => ({
+        id: segment.id,
+        quota_config_id: segment.quota_config_id,
+        category: segment.category as QuotaCategory,
+        segment_name: segment.segment_name,
+        segment_code: segment.segment_code,
+        population_percent: segment.population_percent,
+        dynata_code: segment.dynata_code,
+        created_at: segment.created_at,
+        allocations: segment.allocations?.map((allocation: any) => ({
+          id: allocation.id,
+          line_item_id: allocation.line_item_id,
+          segment_id: allocation.segment_id,
+          quota_count: allocation.quota_count,
+          completed_count: allocation.completed_count,
+          cost_per_complete: allocation.cost_per_complete,
+          status: allocation.status,
+          created_at: allocation.created_at,
+          updated_at: allocation.updated_at,
+          tracking: allocation.tracking?.[0] ? {
+            id: allocation.tracking[0].id,
+            project_id: allocation.tracking[0].project_id,
+            segment_id: allocation.tracking[0].segment_id,
+            allocation_id: allocation.tracking[0].allocation_id,
+            current_count: allocation.tracking[0].current_count,
+            completion_rate: allocation.tracking[0].completion_rate,
+            performance_score: allocation.tracking[0].performance_score,
+            cost_tracking: allocation.tracking[0].cost_tracking,
+            last_response_at: allocation.tracking[0].last_response_at,
+            created_at: allocation.tracking[0].created_at,
+            updated_at: allocation.tracking[0].updated_at
+          } : undefined
+        }))
       }))
-    } as QuotaConfiguration;
+    };
+
+    return transformedData;
   }
 
   // Quota Segments Management
@@ -220,11 +258,34 @@ export class ApiService {
       .eq('line_item_id', lineItemId);
 
     if (error) throw error;
-    return data.map(allocation => ({
-      ...allocation,
+    
+    // Transform the data to match our interfaces
+    return data.map((allocation: any) => ({
+      id: allocation.id,
+      line_item_id: allocation.line_item_id,
+      segment_id: allocation.segment_id,
+      quota_count: allocation.quota_count,
+      completed_count: allocation.completed_count,
+      cost_per_complete: allocation.cost_per_complete,
+      status: allocation.status,
+      created_at: allocation.created_at,
+      updated_at: allocation.updated_at,
       segment: allocation.segment ? {
         ...allocation.segment,
         category: allocation.segment.category as QuotaCategory
+      } : undefined,
+      tracking: allocation.tracking?.[0] ? {
+        id: allocation.tracking[0].id,
+        project_id: allocation.tracking[0].project_id,
+        segment_id: allocation.tracking[0].segment_id,
+        allocation_id: allocation.tracking[0].allocation_id,
+        current_count: allocation.tracking[0].current_count,
+        completion_rate: allocation.tracking[0].completion_rate,
+        performance_score: allocation.tracking[0].performance_score,
+        cost_tracking: allocation.tracking[0].cost_tracking,
+        last_response_at: allocation.tracking[0].last_response_at,
+        created_at: allocation.tracking[0].created_at,
+        updated_at: allocation.tracking[0].updated_at
       } : undefined
     })) as QuotaAllocation[];
   }

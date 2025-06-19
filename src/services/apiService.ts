@@ -1,11 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Project,
-  LineItem,
-  Response,
-  ChannelType,
-  QuotaConfiguration,
-  QuotaSegment,
+import { 
+  Project, 
+  LineItem, 
+  Response, 
+  ChannelType, 
+  QuotaConfiguration, 
+  QuotaSegment, 
   QuotaAllocation,
   SegmentTracking,
   QuotaGeneratorConfig,
@@ -673,7 +673,7 @@ export class ApiService {
       }
       throw new Error('Failed to generate quotas from API');
     }
-  }
+ }
 
   static async listSavedQuotas(): Promise<any[]> {
     console.log('Fetching saved quotas from Quota Generator API via edge function');

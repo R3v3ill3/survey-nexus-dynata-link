@@ -1,11 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  Project, 
-  LineItem, 
-  Response, 
-  ChannelType, 
-  QuotaConfiguration, 
-  QuotaSegment, 
+import {
+  Project,
+  LineItem,
+  Response,
+  ChannelType,
+  QuotaConfiguration,
+  QuotaSegment,
   QuotaAllocation,
   SegmentTracking,
   QuotaGeneratorConfig,

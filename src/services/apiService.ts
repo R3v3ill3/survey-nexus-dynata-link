@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Project, 
@@ -256,6 +257,77 @@ export class ApiService {
     return data as QuotaConfiguration;
   }
 
+  // New method to clean up existing quota data for a project
+  static async cleanupExistingQuotaData(projectId: string) {
+    console.log('Cleaning up existing quota data for project:', projectId);
+    
+    try {
+      // Get existing quota configuration
+      const { data: existingConfig } = await supabase
+        .from('quota_configurations')
+        .select('id')
+        .eq('project_id', projectId)
+        .maybeSingle();
+
+      if (!existingConfig) {
+        console.log('No existing quota configuration found');
+        return;
+      }
+
+      console.log('Found existing quota configuration:', existingConfig.id);
+
+      // Delete segment tracking records first (they reference allocations)
+      const { error: trackingError } = await supabase
+        .from('segment_tracking')
+        .delete()
+        .eq('project_id', projectId);
+
+      if (trackingError) {
+        console.error('Error deleting segment tracking:', trackingError);
+      }
+
+      // Delete quota allocations (they reference segments)
+      const { error: allocationsError } = await supabase
+        .from('quota_allocations')
+        .delete()
+        .in('segment_id', 
+          supabase
+            .from('quota_segments')
+            .select('id')
+            .eq('quota_config_id', existingConfig.id)
+        );
+
+      if (allocationsError) {
+        console.error('Error deleting quota allocations:', allocationsError);
+      }
+
+      // Delete quota segments
+      const { error: segmentsError } = await supabase
+        .from('quota_segments')
+        .delete()
+        .eq('quota_config_id', existingConfig.id);
+
+      if (segmentsError) {
+        console.error('Error deleting quota segments:', segmentsError);
+      }
+
+      // Finally, delete the quota configuration
+      const { error: configError } = await supabase
+        .from('quota_configurations')
+        .delete()
+        .eq('id', existingConfig.id);
+
+      if (configError) {
+        console.error('Error deleting quota configuration:', configError);
+      } else {
+        console.log('Successfully cleaned up existing quota data');
+      }
+
+    } catch (error) {
+      console.error('Error during quota data cleanup:', error);
+    }
+  }
+
   static async getQuotaConfiguration(projectId: string): Promise<QuotaConfiguration | null> {
     const { data, error } = await supabase
       .from('quota_configurations')
@@ -363,15 +435,35 @@ export class ApiService {
       .from('quota_configurations')
       .select('project_id')
       .eq('id', firstSegment.quota_config_id)
-      .single();
+      .maybeSingle();
 
     if (!quotaConfig) return;
 
+    // Create initial quota allocations for each segment (with default values)
+    const allocations = segments.map(segment => ({
+      line_item_id: null, // Will be set when line items are created
+      segment_id: segment.id,
+      quota_count: Math.round((segment.population_percent || 0) * 10), // Default quota based on population
+      completed_count: 0,
+      cost_per_complete: 5.0,
+      status: 'active'
+    }));
+
+    const { data: createdAllocations, error: allocationError } = await supabase
+      .from('quota_allocations')
+      .insert(allocations.filter(a => a.segment_id)) // Only insert if we have valid segment_id
+      .select();
+
+    if (allocationError) {
+      console.error('Failed to create initial quota allocations:', allocationError);
+      return;
+    }
+
     // Create initial segment tracking records
-    const trackingRecords = segments.map(segment => ({
+    const trackingRecords = segments.map((segment, index) => ({
       project_id: quotaConfig.project_id,
       segment_id: segment.id,
-      allocation_id: null, // Will be updated when allocations are created
+      allocation_id: createdAllocations?.[index]?.id || null,
       current_count: 0,
       completion_rate: 0,
       performance_score: 1.0,
@@ -489,6 +581,9 @@ export class ApiService {
     generatorConfig: QuotaGeneratorConfig,
     quotaResponses: QuotaGeneratorResponse[]
   ) {
+    // Clean up existing quota data first
+    await this.cleanupExistingQuotaData(projectId);
+
     // Create quota configuration
     const quotaConfig = await this.createQuotaConfiguration({
       project_id: projectId,
@@ -821,6 +916,9 @@ export class ApiService {
     apiResponse: any
   ) {
     console.log('Processing API response for project:', projectId, apiResponse);
+    
+    // Clean up existing quota data first
+    await this.cleanupExistingQuotaData(projectId);
     
     // Handle different response structures
     const quotaData = apiResponse.quota || apiResponse;

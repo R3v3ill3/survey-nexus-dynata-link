@@ -716,8 +716,11 @@ export class ApiService {
       const data = await response.json();
       console.log('Fetched saved quotas successfully:', data);
       
+      // Extract quotas from the response structure
+      const quotas = data.quotas || data;
+      
       // Handle both single quota response and array response
-      return Array.isArray(data) ? data : [data];
+      return Array.isArray(quotas) ? quotas : [quotas];
       
     } catch (error) {
       console.error('Error fetching saved quotas:', error);

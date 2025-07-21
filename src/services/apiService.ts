@@ -649,11 +649,11 @@ export class ApiService {
       
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'x-api-key': api_key,
+        'Authorization': `Bearer ${api_key}`,
       };
       
       if (survey_id) {
-        headers['x-survey-id'] = survey_id;
+        headers['X-Survey-ID'] = survey_id;
       }
       
       const response = await fetch(`${QUOTA_GENERATOR_API_BASE}/generate-quotas`, {
@@ -693,12 +693,12 @@ export class ApiService {
     
     try {
       const headers: Record<string, string> = {
-        'x-api-key': api_key,
+        'Authorization': `Bearer ${api_key}`,
         'Content-Type': 'application/json'
       };
       
       if (survey_id) {
-        headers['x-survey-id'] = survey_id;
+        headers['X-Survey-ID'] = survey_id;
       }
       
       console.log('Making direct API request to Quota Generator');
@@ -740,7 +740,7 @@ export class ApiService {
       const response = await fetch(`${QUOTA_GENERATOR_API_BASE}/get-saved-quota/${quotaId}`, {
         method: 'GET',
         headers: {
-          'x-api-key': api_key,
+          'Authorization': `Bearer ${api_key}`,
           'Content-Type': 'application/json'
         }
       });
@@ -820,7 +820,7 @@ export class ApiService {
       const response = await fetch(`${QUOTA_GENERATOR_API_BASE}/list-saved-quotas`, {
         method: 'GET',
         headers: {
-          'x-api-key': apiKey,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         }
       });

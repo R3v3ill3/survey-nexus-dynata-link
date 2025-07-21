@@ -286,19 +286,23 @@ export class ApiService {
         console.error('Error deleting segment tracking:', trackingError);
       }
 
-      // Delete quota allocations (they reference segments)
-      const { error: allocationsError } = await supabase
-        .from('quota_allocations')
-        .delete()
-        .in('segment_id', 
-          supabase
-            .from('quota_segments')
-            .select('id')
-            .eq('quota_config_id', existingConfig.id)
-        );
+      // Get segment IDs first
+      const { data: segments } = await supabase
+        .from('quota_segments')
+        .select('id')
+        .eq('quota_config_id', existingConfig.id);
 
-      if (allocationsError) {
-        console.error('Error deleting quota allocations:', allocationsError);
+      // Delete quota allocations (they reference segments)
+      if (segments && segments.length > 0) {
+        const segmentIds = segments.map(s => s.id);
+        const { error: allocationsError } = await supabase
+          .from('quota_allocations')
+          .delete()
+          .in('segment_id', segmentIds);
+
+        if (allocationsError) {
+          console.error('Error deleting quota allocations:', allocationsError);
+        }
       }
 
       // Delete quota segments

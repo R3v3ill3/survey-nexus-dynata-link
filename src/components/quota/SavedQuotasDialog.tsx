@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -18,6 +17,7 @@ const SavedQuotasDialog = ({ open, onOpenChange, onQuotaSelected }: SavedQuotasD
   const [savedQuotas, setSavedQuotas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingQuotaId, setLoadingQuotaId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -66,10 +66,41 @@ const SavedQuotasDialog = ({ open, onOpenChange, onQuotaSelected }: SavedQuotasD
     }
   };
 
-  const handleSelectQuota = (quota: any) => {
-    console.log('Selected quota:', quota);
-    onQuotaSelected(quota);
-    onOpenChange(false);
+  const handleSelectQuota = async (quota: any) => {
+    console.log('Selecting quota:', quota);
+    
+    if (!quota.id) {
+      console.warn('No quota ID found, using summary data');
+      onQuotaSelected(quota);
+      onOpenChange(false);
+      return;
+    }
+
+    try {
+      setLoadingQuotaId(quota.id);
+      console.log('Fetching full quota details for ID:', quota.id);
+      
+      // Fetch the full quota details including segments
+      const fullQuotaData = await ApiService.getSavedQuota(quota.id);
+      console.log('Full quota data retrieved:', fullQuotaData);
+      
+      onQuotaSelected(fullQuotaData);
+      onOpenChange(false);
+      
+    } catch (error) {
+      console.error('Error fetching full quota details:', error);
+      toast({
+        title: "Error Loading Quota",
+        description: "Failed to load quota details. Using summary data instead.",
+        variant: "destructive"
+      });
+      
+      // Fallback to summary data
+      onQuotaSelected(quota);
+      onOpenChange(false);
+    } finally {
+      setLoadingQuotaId(null);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -172,8 +203,16 @@ const SavedQuotasDialog = ({ open, onOpenChange, onQuotaSelected }: SavedQuotasD
                       <Button 
                         onClick={() => handleSelectQuota(quota)}
                         size="sm"
+                        disabled={loadingQuotaId === quota.id}
                       >
-                        Import This Configuration
+                        {loadingQuotaId === quota.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Loading...
+                          </>
+                        ) : (
+                          "Import This Configuration"
+                        )}
                       </Button>
                     </div>
                   </CardContent>

@@ -156,15 +156,21 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
     });
   };
 
-  const handleSavedQuotaSelect = (savedQuota: any) => {
-    onSubmit({
-      geography: savedQuota.geography?.scope || "National",
-      geographyDetail: savedQuota.geography?.detail || "",
-      quotaMode: savedQuota.quotaMode || "non-interlocking",
-      targetSampleSize: savedQuota.sampleSize?.toString() || "1000",
+  const handleSavedQuotaSelect = (fullQuotaData: any) => {
+    console.log('Processing full quota data:', fullQuotaData);
+    
+    // Extract quota configuration details from the full data
+    const quotaConfig = {
+      geography: fullQuotaData.geography?.scope || "National",
+      geographyDetail: fullQuotaData.geography?.detail || fullQuotaData.geography?.state || "",
+      quotaMode: fullQuotaData.quotaMode || "non-interlocking",
+      targetSampleSize: fullQuotaData.sampleSize?.toString() || fullQuotaData.targetSampleSize?.toString() || "1000",
       useApi: true,
-      savedQuota: savedQuota
-    });
+      savedQuota: fullQuotaData
+    };
+    
+    console.log('Processed quota config:', quotaConfig);
+    onSubmit(quotaConfig);
   };
 
   const handleApiKeySet = () => {

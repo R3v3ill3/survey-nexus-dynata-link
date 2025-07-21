@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Project, 
@@ -174,7 +173,7 @@ export class ApiService {
     return data;
   }
 
-  // Line Item Management - Updated to use direct database queries
+  // Line Item Management - Updated to handle quota allocations
   static async createLineItem(
     projectId: string, 
     name: string, 
@@ -187,7 +186,7 @@ export class ApiService {
     if (!user) throw new Error('Authentication required');
 
     // Create line item in local database
-    const { data, error } = await supabase
+    const { data: lineItem, error } = await supabase
       .from('line_items')
       .insert({
         project_id: projectId,
@@ -202,7 +201,75 @@ export class ApiService {
       .single();
 
     if (error) throw error;
-    return data as LineItem;
+
+    // Create quota allocations for this line item if quota configuration exists
+    await this.createQuotaAllocationsForLineItem(lineItem.id, projectId, quota);
+
+    return lineItem as LineItem;
+  }
+
+  // New method to create quota allocations for a line item
+  static async createQuotaAllocationsForLineItem(
+    lineItemId: string, 
+    projectId: string, 
+    totalQuota: number
+  ) {
+    try {
+      // Get quota configuration and segments for the project
+      const quotaConfig = await this.getQuotaConfiguration(projectId);
+      if (!quotaConfig || !quotaConfig.segments) {
+        console.log('No quota configuration found for project, skipping allocation creation');
+        return;
+      }
+
+      // Calculate quota allocation per segment based on population percentage
+      const allocations = quotaConfig.segments.map(segment => {
+        const segmentQuota = Math.round((segment.population_percent || 0) * totalQuota / 100);
+        return {
+          line_item_id: lineItemId,
+          segment_id: segment.id,
+          quota_count: Math.max(1, segmentQuota), // Ensure at least 1 quota per segment
+          completed_count: 0,
+          cost_per_complete: 5.0,
+          status: 'active'
+        };
+      });
+
+      if (allocations.length === 0) {
+        console.log('No segments found, skipping allocation creation');
+        return;
+      }
+
+      // Create quota allocations
+      const { data: createdAllocations, error: allocationError } = await supabase
+        .from('quota_allocations')
+        .insert(allocations)
+        .select();
+
+      if (allocationError) {
+        console.error('Failed to create quota allocations:', allocationError);
+        return;
+      }
+
+      console.log('Created quota allocations:', createdAllocations);
+
+      // Update segment tracking records with allocation IDs
+      for (let i = 0; i < createdAllocations.length; i++) {
+        const allocation = createdAllocations[i];
+        const segment = quotaConfig.segments[i];
+        
+        await supabase
+          .from('segment_tracking')
+          .update({ allocation_id: allocation.id })
+          .eq('segment_id', segment.id)
+          .eq('project_id', projectId);
+      }
+
+      console.log('Updated segment tracking with allocation IDs');
+
+    } catch (error) {
+      console.error('Error creating quota allocations for line item:', error);
+    }
   }
 
   static async getLineItems(projectId: string) {
@@ -402,7 +469,7 @@ export class ApiService {
     return transformedData;
   }
 
-  // Enhanced Quota Segments Management with tracking creation
+  // Enhanced Quota Segments Management with simplified tracking creation
   static async createQuotaSegments(segments: Omit<QuotaSegment, 'id' | 'created_at'>[]) {
     const { data, error } = await supabase
       .from('quota_segments')
@@ -423,13 +490,13 @@ export class ApiService {
       category: segment.category as QuotaCategory
     })) as QuotaSegment[];
 
-    // After creating segments, create initial segment tracking records
+    // After creating segments, create initial segment tracking records (without allocations)
     await this.createInitialSegmentTracking(createdSegments);
 
     return createdSegments;
   }
 
-  // New method to create initial segment tracking records
+  // Updated method to create initial segment tracking records without quota allocations
   private static async createInitialSegmentTracking(segments: QuotaSegment[]) {
     if (segments.length === 0) return;
 
@@ -443,31 +510,11 @@ export class ApiService {
 
     if (!quotaConfig) return;
 
-    // Create initial quota allocations for each segment (with default values)
-    const allocations = segments.map(segment => ({
-      line_item_id: null, // Will be set when line items are created
-      segment_id: segment.id,
-      quota_count: Math.round((segment.population_percent || 0) * 10), // Default quota based on population
-      completed_count: 0,
-      cost_per_complete: 5.0,
-      status: 'active'
-    }));
-
-    const { data: createdAllocations, error: allocationError } = await supabase
-      .from('quota_allocations')
-      .insert(allocations.filter(a => a.segment_id)) // Only insert if we have valid segment_id
-      .select();
-
-    if (allocationError) {
-      console.error('Failed to create initial quota allocations:', allocationError);
-      return;
-    }
-
-    // Create initial segment tracking records
-    const trackingRecords = segments.map((segment, index) => ({
+    // Create initial segment tracking records (without allocation_id)
+    const trackingRecords = segments.map(segment => ({
       project_id: quotaConfig.project_id,
       segment_id: segment.id,
-      allocation_id: createdAllocations?.[index]?.id || null,
+      allocation_id: null, // Will be set when line items are created
       current_count: 0,
       completion_rate: 0,
       performance_score: 1.0,
@@ -481,6 +528,8 @@ export class ApiService {
 
     if (trackingError) {
       console.error('Failed to create initial segment tracking:', trackingError);
+    } else {
+      console.log('Successfully created initial segment tracking records');
     }
   }
 

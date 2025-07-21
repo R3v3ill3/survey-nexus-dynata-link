@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, Settings, Target } from "lucide-react";
+import { BarChart3, Settings, Target, RefreshCw } from "lucide-react";
 import { QuotaConfiguration } from "@/types/database";
 
 interface QuotaConfigurationCardProps {
@@ -26,13 +26,26 @@ const QuotaConfigurationCard = ({ quotaConfig, onConfigureClick }: QuotaConfigur
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
-            Australian Quota Configuration
-          </CardTitle>
-          <CardDescription>
-            Current quota setup for {quotaConfig.geography_scope} targeting
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
+                Australian Quota Configuration
+              </CardTitle>
+              <CardDescription>
+                Current quota setup for {quotaConfig.geography_scope} targeting
+              </CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={onConfigureClick}
+              className="flex items-center"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Change Configuration
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

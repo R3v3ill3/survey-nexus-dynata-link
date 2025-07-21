@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Project, 
@@ -790,27 +791,65 @@ export class ApiService {
       geography_scope: quotaData.geography?.scope || apiResponse.geography?.scope || 'National',
       geography_detail: quotaData.geography?.detail || quotaData.geography?.state || apiResponse.geography?.detail,
       quota_mode: quotaData.quotaMode || apiResponse.quotaMode || 'non-interlocking',
-      total_quotas: quotaData.totalQuotas || apiResponse.totalQuotas || quotaData.quotaSegments?.length || 0,
+      total_quotas: quotaData.totalQuotas || apiResponse.totalQuotas || quotaData.quotaSegments?.length || apiResponse.quotas?.length || 0,
       sample_size_multiplier: quotaData.sampleMultiplier || apiResponse.sampleMultiplier || 1.0,
       complexity_level: quotaData.complexityLevel || apiResponse.complexityLevel || 'low'
     });
 
     console.log('Created quota configuration:', quotaConfig);
 
-    // Process quota segments from API response
-    const quotaSegments = quotaData.quotaSegments || apiResponse.quotaSegments || quotaData.segments || [];
+    // Process quota segments from API response - Check multiple possible locations
+    let quotaSegments = null;
     
-    if (quotaSegments && Array.isArray(quotaSegments) && quotaSegments.length > 0) {
+    // First priority: Check for quotas array (the actual data location)
+    if (apiResponse.quotas && Array.isArray(apiResponse.quotas)) {
+      console.log('Found quotas array in API response:', apiResponse.quotas);
+      quotaSegments = apiResponse.quotas;
+    }
+    // Fallback: Check for quotaSegments
+    else if (quotaData.quotaSegments && Array.isArray(quotaData.quotaSegments)) {
+      console.log('Found quotaSegments in quotaData:', quotaData.quotaSegments);
+      quotaSegments = quotaData.quotaSegments;
+    }
+    // Fallback: Check for segments
+    else if (quotaData.segments && Array.isArray(quotaData.segments)) {
+      console.log('Found segments in quotaData:', quotaData.segments);
+      quotaSegments = quotaData.segments;
+    }
+    // Fallback: Check for quotaSegments at root level
+    else if (apiResponse.quotaSegments && Array.isArray(apiResponse.quotaSegments)) {
+      console.log('Found quotaSegments at root level:', apiResponse.quotaSegments);
+      quotaSegments = apiResponse.quotaSegments;
+    }
+
+    if (quotaSegments && quotaSegments.length > 0) {
       console.log('Processing quota segments:', quotaSegments);
       
-      const segments = quotaSegments.map((segment: any) => ({
-        quota_config_id: quotaConfig.id,
-        category: segment.category as QuotaCategory,
-        segment_name: segment.name || segment.segment_name || segment.subCategory,
-        segment_code: segment.code || segment.segment_code || this.generateSegmentCode(segment.category, segment.name || segment.subCategory),
-        population_percent: segment.population_percent || segment.percentage || segment.populationPercent,
-        dynata_code: segment.dynata_code || segment.dynataCode
-      }));
+      const segments = quotaSegments.map((segment: any) => {
+        // Handle different segment structures
+        const category = segment.category || segment.demographic || 'Demographics';
+        const segmentName = segment.name || segment.segment_name || segment.subCategory || segment.sub_category || 'Unknown';
+        const segmentCode = segment.code || segment.segment_code || this.generateSegmentCode(category, segmentName);
+        const populationPercent = segment.population_percent || segment.percentage || segment.populationPercent || segment.quota_percent || 0;
+        const dynataCode = segment.dynata_code || segment.dynataCode || segment.code;
+
+        console.log('Processing segment:', {
+          category,
+          segmentName,
+          segmentCode,
+          populationPercent,
+          dynataCode
+        });
+
+        return {
+          quota_config_id: quotaConfig.id,
+          category: category as QuotaCategory,
+          segment_name: segmentName,
+          segment_code: segmentCode,
+          population_percent: populationPercent,
+          dynata_code: dynataCode
+        };
+      });
 
       const createdSegments = await this.createQuotaSegments(segments);
       console.log('Created segments:', createdSegments);
@@ -822,7 +861,7 @@ export class ApiService {
       };
     }
 
-    console.log('No segments found in API response');
+    console.log('No segments found in API response - checked quotas, quotaSegments, and segments arrays');
     return {
       configuration: quotaConfig,
       segments: [],

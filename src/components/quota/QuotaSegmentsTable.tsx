@@ -4,13 +4,17 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart3, Info } from "lucide-react";
-import { SegmentTracking } from "@/types/database";
+import { SegmentTracking, QuotaSegment } from "@/types/database";
 
 interface QuotaSegmentsTableProps {
+  quotaSegments: QuotaSegment[];
   segmentTracking: SegmentTracking[];
 }
 
-const QuotaSegmentsTable = ({ segmentTracking }: QuotaSegmentsTableProps) => {
+const QuotaSegmentsTable = ({ quotaSegments, segmentTracking }: QuotaSegmentsTableProps) => {
+  // Create a map of segment tracking data for quick lookup
+  const trackingMap = new Map(segmentTracking.map(t => [t.segment_id, t]));
+  
   return (
     <Card>
       <CardHeader>
@@ -18,7 +22,7 @@ const QuotaSegmentsTable = ({ segmentTracking }: QuotaSegmentsTableProps) => {
         <CardDescription>Real-time tracking of demographic segment performance</CardDescription>
       </CardHeader>
       <CardContent>
-        {segmentTracking.length > 0 ? (
+        {quotaSegments.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -31,53 +35,56 @@ const QuotaSegmentsTable = ({ segmentTracking }: QuotaSegmentsTableProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {segmentTracking.map((tracking) => (
-                <TableRow key={tracking.id}>
-                  <TableCell>
-                    <div className="font-medium">
-                      {tracking.segment?.segment_name || 'Unknown Segment'}
-                    </div>
-                    <div className="text-sm text-slate-500">
-                      {tracking.segment?.segment_code || 'N/A'}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {tracking.segment?.category || 'N/A'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {tracking.segment?.population_percent?.toFixed(1) || '0.0'}%
-                  </TableCell>
-                  <TableCell>
-                    {tracking.current_count}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Progress 
-                        value={tracking.completion_rate * 100} 
-                        className="w-20 h-2" 
-                      />
-                      <span className="text-sm">
-                        {(tracking.completion_rate * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    A${tracking.cost_tracking.toFixed(2)}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {quotaSegments.map((segment) => {
+                const tracking = trackingMap.get(segment.id);
+                return (
+                  <TableRow key={segment.id}>
+                    <TableCell>
+                      <div className="font-medium">
+                        {segment.segment_name}
+                      </div>
+                      <div className="text-sm text-slate-500">
+                        {segment.segment_code}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {segment.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {segment.population_percent?.toFixed(1) || '0.0'}%
+                    </TableCell>
+                    <TableCell>
+                      {tracking?.current_count || 0}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <Progress 
+                          value={(tracking?.completion_rate || 0) * 100} 
+                          className="w-20 h-2" 
+                        />
+                        <span className="text-sm">
+                          {((tracking?.completion_rate || 0) * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      A${(tracking?.cost_tracking || 0).toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         ) : (
           <div className="text-center py-8">
             <BarChart3 className="h-12 w-12 mx-auto mb-4 text-slate-300" />
             <div className="space-y-2">
-              <p className="text-slate-600 font-medium">No segment tracking data available</p>
+              <p className="text-slate-600 font-medium">No quota segments configured</p>
               <div className="flex items-center justify-center space-x-2 text-sm text-slate-500">
                 <Info className="h-4 w-4" />
-                <p>Segment tracking begins when you create line items for this project</p>
+                <p>Create a quota configuration to define demographic segments for this project</p>
               </div>
             </div>
           </div>

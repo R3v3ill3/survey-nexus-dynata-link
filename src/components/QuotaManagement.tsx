@@ -11,7 +11,8 @@ import {
   Project, 
   QuotaConfiguration, 
   QuotaAllocation, 
-  SegmentTracking
+  SegmentTracking,
+  QuotaSegment
 } from "@/types/database";
 
 // Import new components
@@ -31,6 +32,7 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
   const [quotaConfig, setQuotaConfig] = useState<QuotaConfiguration | null>(null);
   const [quotaAllocations, setQuotaAllocations] = useState<QuotaAllocation[]>([]);
   const [segmentTracking, setSegmentTracking] = useState<SegmentTracking[]>([]);
+  const [quotaSegments, setQuotaSegments] = useState<QuotaSegment[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isQuotaConfigDialogOpen, setIsQuotaConfigDialogOpen] = useState(false);
@@ -70,6 +72,10 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
       const quotaConfigData = await ApiService.getQuotaConfiguration(activeProject.id);
       if (quotaConfigData) {
         setQuotaConfig(quotaConfigData);
+        
+        // Load quota segments if configuration exists
+        const segmentsData = await ApiService.getQuotaSegments(quotaConfigData.id);
+        setQuotaSegments(segmentsData);
       }
 
       // Load segment tracking
@@ -247,13 +253,7 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
       {/* Summary Cards */}
       <QuotaSummaryCards 
         lineItems={lineItems} 
-        quotaSegmentsCount={quotaConfig?.total_quotas || 0}
-      />
-
-      {/* Quota Configuration Status */}
-      <QuotaConfigurationCard 
-        quotaConfig={quotaConfig} 
-        onConfigureClick={() => setIsQuotaConfigDialogOpen(true)}
+        quotaSegmentsCount={quotaSegments.length}
       />
 
       {/* Main Management Tabs */}
@@ -272,7 +272,10 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
         </TabsContent>
 
         <TabsContent value="segments">
-          <QuotaSegmentsTable segmentTracking={segmentTracking} />
+          <QuotaSegmentsTable 
+            quotaSegments={quotaSegments} 
+            segmentTracking={segmentTracking} 
+          />
         </TabsContent>
 
         <TabsContent value="line-items">

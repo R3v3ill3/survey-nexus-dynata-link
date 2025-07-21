@@ -243,12 +243,10 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
       />
 
       {/* Quota Configuration Status */}
-      {quotaConfig && (
-        <QuotaConfigurationCard 
-          quotaConfig={quotaConfig} 
-          onConfigureClick={() => setIsQuotaConfigDialogOpen(true)}
-        />
-      )}
+      <QuotaConfigurationCard 
+        quotaConfig={quotaConfig} 
+        onConfigureClick={() => setIsQuotaConfigDialogOpen(true)}
+      />
 
       {/* Main Management Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">

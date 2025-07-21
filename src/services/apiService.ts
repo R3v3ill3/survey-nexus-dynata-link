@@ -253,19 +253,27 @@ export class ApiService {
 
       console.log('Created quota allocations:', createdAllocations);
 
-      // Update segment tracking records with allocation IDs
-      for (let i = 0; i < createdAllocations.length; i++) {
-        const allocation = createdAllocations[i];
-        const segment = quotaConfig.segments[i];
-        
-        await supabase
-          .from('segment_tracking')
-          .update({ allocation_id: allocation.id })
-          .eq('segment_id', segment.id)
-          .eq('project_id', projectId);
-      }
+      // NOW create segment tracking records with valid allocation IDs
+      const trackingRecords = createdAllocations.map(allocation => ({
+        project_id: projectId,
+        segment_id: allocation.segment_id,
+        allocation_id: allocation.id, // Now we have valid allocation IDs
+        current_count: 0,
+        completion_rate: 0,
+        performance_score: 1.0,
+        cost_tracking: 0,
+        last_response_at: null
+      }));
 
-      console.log('Updated segment tracking with allocation IDs');
+      const { error: trackingError } = await supabase
+        .from('segment_tracking')
+        .insert(trackingRecords);
+
+      if (trackingError) {
+        console.error('Failed to create segment tracking:', trackingError);
+      } else {
+        console.log('Successfully created segment tracking records with valid allocation IDs');
+      }
 
     } catch (error) {
       console.error('Error creating quota allocations for line item:', error);
@@ -469,7 +477,7 @@ export class ApiService {
     return transformedData;
   }
 
-  // Enhanced Quota Segments Management with simplified tracking creation
+  // Enhanced Quota Segments Management - UPDATED to remove initial segment tracking creation
   static async createQuotaSegments(segments: Omit<QuotaSegment, 'id' | 'created_at'>[]) {
     const { data, error } = await supabase
       .from('quota_segments')
@@ -490,47 +498,11 @@ export class ApiService {
       category: segment.category as QuotaCategory
     })) as QuotaSegment[];
 
-    // After creating segments, create initial segment tracking records (without allocations)
-    await this.createInitialSegmentTracking(createdSegments);
+    // REMOVED: No longer creating initial segment tracking records here
+    // This prevents the NOT NULL constraint error on allocation_id
+    console.log('Created quota segments without initial tracking:', createdSegments);
 
     return createdSegments;
-  }
-
-  // Updated method to create initial segment tracking records without quota allocations
-  private static async createInitialSegmentTracking(segments: QuotaSegment[]) {
-    if (segments.length === 0) return;
-
-    // Get the project ID from the first segment's quota configuration
-    const firstSegment = segments[0];
-    const { data: quotaConfig } = await supabase
-      .from('quota_configurations')
-      .select('project_id')
-      .eq('id', firstSegment.quota_config_id)
-      .maybeSingle();
-
-    if (!quotaConfig) return;
-
-    // Create initial segment tracking records (without allocation_id)
-    const trackingRecords = segments.map(segment => ({
-      project_id: quotaConfig.project_id,
-      segment_id: segment.id,
-      allocation_id: null, // Will be set when line items are created
-      current_count: 0,
-      completion_rate: 0,
-      performance_score: 1.0,
-      cost_tracking: 0,
-      last_response_at: null
-    }));
-
-    const { error: trackingError } = await supabase
-      .from('segment_tracking')
-      .insert(trackingRecords);
-
-    if (trackingError) {
-      console.error('Failed to create initial segment tracking:', trackingError);
-    } else {
-      console.log('Successfully created initial segment tracking records');
-    }
   }
 
   static async getQuotaSegments(quotaConfigId: string) {
@@ -963,7 +935,7 @@ export class ApiService {
     }
   }
 
-  // Enhanced quota processing from API with better error handling and tracking creation
+  // Enhanced quota processing from API with better error handling - UPDATED to remove tracking creation
   static async processQuotaGeneratorAPIResponse(
     projectId: string,
     apiResponse: any
@@ -1017,7 +989,6 @@ export class ApiService {
       console.log('Processing quota segments:', quotaSegments);
       
       const segments = quotaSegments.map((segment: any) => {
-        // Handle different segment structures
         const category = segment.category || segment.demographic || 'Demographics';
         const segmentName = segment.name || segment.segment_name || segment.subCategory || segment.sub_category || 'Unknown';
         const segmentCode = segment.code || segment.segment_code || this.generateSegmentCode(category, segmentName);
@@ -1042,6 +1013,7 @@ export class ApiService {
         };
       });
 
+      // UPDATED: Now just creates segments without initial tracking
       const createdSegments = await this.createQuotaSegments(segments);
       console.log('Created segments:', createdSegments);
       

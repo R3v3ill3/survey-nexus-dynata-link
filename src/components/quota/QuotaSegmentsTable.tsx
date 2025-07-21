@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Info } from "lucide-react";
 import { SegmentTracking } from "@/types/database";
 
 interface QuotaSegmentsTableProps {
@@ -73,7 +73,13 @@ const QuotaSegmentsTable = ({ segmentTracking }: QuotaSegmentsTableProps) => {
         ) : (
           <div className="text-center py-8">
             <BarChart3 className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-            <p className="text-slate-600">No segment tracking data available</p>
+            <div className="space-y-2">
+              <p className="text-slate-600 font-medium">No segment tracking data available</p>
+              <div className="flex items-center justify-center space-x-2 text-sm text-slate-500">
+                <Info className="h-4 w-4" />
+                <p>Segment tracking begins when you create line items for this project</p>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

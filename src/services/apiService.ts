@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Project, 
@@ -327,7 +326,7 @@ export class ApiService {
     return transformedData;
   }
 
-  // Quota Segments Management
+  // Enhanced Quota Segments Management with tracking creation
   static async createQuotaSegments(segments: Omit<QuotaSegment, 'id' | 'created_at'>[]) {
     const { data, error } = await supabase
       .from('quota_segments')
@@ -342,10 +341,51 @@ export class ApiService {
       .select();
 
     if (error) throw error;
-    return data.map(segment => ({
+    
+    const createdSegments = data.map(segment => ({
       ...segment,
       category: segment.category as QuotaCategory
     })) as QuotaSegment[];
+
+    // After creating segments, create initial segment tracking records
+    await this.createInitialSegmentTracking(createdSegments);
+
+    return createdSegments;
+  }
+
+  // New method to create initial segment tracking records
+  private static async createInitialSegmentTracking(segments: QuotaSegment[]) {
+    if (segments.length === 0) return;
+
+    // Get the project ID from the first segment's quota configuration
+    const firstSegment = segments[0];
+    const { data: quotaConfig } = await supabase
+      .from('quota_configurations')
+      .select('project_id')
+      .eq('id', firstSegment.quota_config_id)
+      .single();
+
+    if (!quotaConfig) return;
+
+    // Create initial segment tracking records
+    const trackingRecords = segments.map(segment => ({
+      project_id: quotaConfig.project_id,
+      segment_id: segment.id,
+      allocation_id: null, // Will be updated when allocations are created
+      current_count: 0,
+      completion_rate: 0,
+      performance_score: 1.0,
+      cost_tracking: 0,
+      last_response_at: null
+    }));
+
+    const { error: trackingError } = await supabase
+      .from('segment_tracking')
+      .insert(trackingRecords);
+
+    if (trackingError) {
+      console.error('Failed to create initial segment tracking:', trackingError);
+    }
   }
 
   static async getQuotaSegments(quotaConfigId: string) {
@@ -775,7 +815,7 @@ export class ApiService {
     }
   }
 
-  // Enhanced quota processing from API with better error handling
+  // Enhanced quota processing from API with better error handling and tracking creation
   static async processQuotaGeneratorAPIResponse(
     projectId: string,
     apiResponse: any

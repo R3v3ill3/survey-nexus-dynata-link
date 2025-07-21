@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -115,6 +116,9 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
           title: "Quota Configuration Created",
           description: `Successfully created ${result.configuration.total_quotas} quota segments from API`,
         });
+
+        // Reload all project data to ensure consistency
+        await loadProjectData();
       } else if (quotaConfigForm.savedQuota) {
         // Process saved quota configuration
         const result = await ApiService.processQuotaGeneratorAPIResponse(
@@ -129,6 +133,9 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
           title: "Quota Configuration Loaded",
           description: `Successfully loaded saved quota configuration`,
         });
+
+        // Reload all project data to ensure consistency
+        await loadProjectData();
       } else {
         // Generate quota configuration using the quota generator service
         const generatorConfig = QuotaGeneratorService.generateQuotaConfig(
@@ -161,7 +168,8 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
           description: `Successfully created ${generatorConfig.quotaStructure.totalQuotas} quota segments`,
         });
 
-        loadProjectData();
+        // Reload all project data to ensure consistency
+        await loadProjectData();
       }
     } catch (error) {
       console.error('Error creating quota configuration:', error);

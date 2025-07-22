@@ -27,7 +27,7 @@ interface CreateQuotaConfigDialogProps {
 }
 
 const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: CreateQuotaConfigDialogProps) => {
-  const [activeTab, setActiveTab] = useState("generate");
+  const [activeTab, setActiveTab] = useState("saved");
   const [hasApiKey, setHasApiKey] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'valid' | 'invalid' | 'not_set'>('not_set');
   const [currentApiKey, setCurrentApiKey] = useState<string>("");
@@ -248,13 +248,13 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="generate" className="flex items-center">
-                <Zap className="h-4 w-4 mr-1" />
-                Generate New
-              </TabsTrigger>
               <TabsTrigger value="saved" className="flex items-center">
                 <Database className="h-4 w-4 mr-1" />
                 Saved Quotas
+              </TabsTrigger>
+              <TabsTrigger value="import" className="flex items-center">
+                <Zap className="h-4 w-4 mr-1" />
+                Import XML
               </TabsTrigger>
               <TabsTrigger value="local" className="flex items-center">
                 <Settings className="h-4 w-4 mr-1" />
@@ -262,115 +262,88 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="generate" className="space-y-4">
-              <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
-                Generate sophisticated quota structures using the Quota Generator API with real Australian demographic data
-              </div>
-
-              {/* Enhanced API Credentials Status Display */}
-              <div className="bg-slate-50 p-3 rounded-lg border">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-700">API Configuration</span>
-                  {getApiKeyStatusDisplay()}
-                </div>
-                {currentApiKey && (
-                  <div className="mt-2 space-y-1">
-                    <div className="text-xs text-slate-600">
-                      API Key: {currentApiKey.substring(0, 8)}****{currentApiKey.slice(-4)}
-                    </div>
-                    {currentSurveyId && (
-                      <div className="text-xs text-slate-600">
-                        Survey ID: {currentSurveyId}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Geography Scope</Label>
-                  <Select 
-                    value={quotaConfigForm.geography} 
-                    onValueChange={(value: GeographyScope) => setQuotaConfigForm(prev => ({ ...prev, geography: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="National">National</SelectItem>
-                      <SelectItem value="State">State</SelectItem>
-                      <SelectItem value="Federal Electorate">Federal Electorate</SelectItem>
-                      <SelectItem value="State Electorate">State Electorate</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {(quotaConfigForm.geography === 'State' || quotaConfigForm.geography.includes('Electorate')) && (
-                  <div className="space-y-2">
-                    <Label>
-                      {quotaConfigForm.geography === 'State' ? 'State' : 'Electorate Name'}
-                    </Label>
-                    <Input
-                      placeholder={quotaConfigForm.geography === 'State' ? 'NSW, VIC, QLD, etc.' : 'Enter electorate name'}
-                      value={quotaConfigForm.geographyDetail}
-                      onChange={(e) => setQuotaConfigForm(prev => ({ ...prev, geographyDetail: e.target.value }))}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Quota Mode</Label>
-                  <Select 
-                    value={quotaConfigForm.quotaMode}
-                    onValueChange={(value: QuotaMode) => setQuotaConfigForm(prev => ({ ...prev, quotaMode: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="non-interlocking">Non-Interlocking (Simple)</SelectItem>
-                      <SelectItem value="age-gender-location">Age/Gender + Location</SelectItem>
-                      <SelectItem value="age-gender-state">Age/Gender + State</SelectItem>
-                      <SelectItem value="state-location">State + Location</SelectItem>
-                      <SelectItem value="full-interlocking">Full Interlocking (Complex)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Target Sample Size</Label>
-                  <Input
-                    type="number"
-                    placeholder="1000"
-                    value={quotaConfigForm.targetSampleSize}
-                    onChange={(e) => setQuotaConfigForm(prev => ({ ...prev, targetSampleSize: e.target.value }))}
-                  />
-                </div>
+            <TabsContent value="import" className="space-y-4">
+              <div className="text-center py-8">
+                <Zap className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                <h3 className="text-lg font-semibold mb-2">Import XML Configuration</h3>
+                <p className="text-slate-600 mb-4">
+                  Upload an XML file containing quota configuration data
+                </p>
+                <input
+                  type="file"
+                  accept=".xml"
+                  className="hidden"
+                  id="xml-upload"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        try {
+                          const xmlContent = event.target?.result as string;
+                          // Here you would parse the XML and extract quota data
+                          toast({
+                            title: "XML Import",
+                            description: "XML import functionality coming soon",
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Import Error",
+                            description: "Failed to parse XML file",
+                            variant: "destructive"
+                          });
+                        }
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                />
+                <Button 
+                  onClick={() => document.getElementById('xml-upload')?.click()}
+                  variant="outline"
+                >
+                  Select XML File
+                </Button>
+                <p className="text-xs text-slate-500 mt-2">
+                  Supports standard quota XML formats
+                </p>
               </div>
             </TabsContent>
 
             <TabsContent value="saved" className="space-y-4">
-              <div className="text-center py-8">
-                <Database className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-                <h3 className="text-lg font-semibold mb-2">Load Saved Quota Configuration</h3>
-                <p className="text-slate-600 mb-4">
-                  Select from your previously saved quota configurations with detailed demographic breakdowns
-                </p>
-                <Button 
-                  onClick={() => setShowSavedQuotasDialog(true)}
-                  disabled={apiKeyStatus !== 'valid'}
-                >
-                  {apiKeyStatus === 'valid' ? "Browse Saved Quotas" : "API Key Required"}
-                </Button>
-                {apiKeyStatus !== 'valid' && (
-                  <div className="mt-3">
-                    {getApiKeyStatusDisplay()}
+              {apiKeyStatus === 'valid' ? (
+                <div className="text-center py-8">
+                  <Database className="h-12 w-12 mx-auto mb-4 text-blue-500" />
+                  <h3 className="text-lg font-semibold mb-2">Load Saved Quota Configuration</h3>
+                  <p className="text-slate-600 mb-4">
+                    Select from your previously saved quota configurations with detailed demographic breakdowns
+                  </p>
+                  <Button onClick={() => setShowSavedQuotasDialog(true)}>
+                    Browse Saved Quotas
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-8 space-y-4">
+                  <Database className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                  <h3 className="text-lg font-semibold mb-2">API Setup Required</h3>
+                  <p className="text-slate-600 mb-4">
+                    Configure your Quota Generator API credentials to access saved quota configurations
+                  </p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center text-amber-800">
+                      <AlertTriangle className="h-5 w-5 mr-2" />
+                      <span className="font-medium">API credentials not configured</span>
+                    </div>
+                    <p className="text-amber-700 text-sm mt-1">
+                      You need to set up your API key to access saved quota configurations
+                    </p>
                   </div>
-                )}
-              </div>
+                  <Button onClick={() => setShowApiKeyDialog(true)}>
+                    <Key className="h-4 w-4 mr-2" />
+                    Configure API Key
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="local" className="space-y-4">
@@ -412,15 +385,11 @@ const CreateQuotaConfigDialog = ({ open, onOpenChange, onSubmit, loading }: Crea
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            {activeTab === "generate" ? (
-              <Button onClick={handleGenerateWithAPI} disabled={loading || apiKeyStatus !== 'valid'}>
-                {loading ? "Generating..." : "Generate with API"}
-              </Button>
-            ) : activeTab === "local" ? (
+            {activeTab === "local" && (
               <Button onClick={handleSubmitLocal} disabled={loading}>
                 {loading ? "Creating..." : "Create Basic Structure"}
               </Button>
-            ) : null}
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -273,10 +273,27 @@ const ProjectManagement = ({
               </TableHeader>
               <TableBody>
                 {projects.map((project) => (
-                  <TableRow key={project.id}>
+                  <TableRow 
+                    key={project.id}
+                    className={`cursor-pointer hover:bg-muted/50 transition-colors ${
+                      activeProject?.id === project.id ? 'bg-primary/10 border-l-4 border-l-primary' : ''
+                    }`}
+                    onClick={() => handleSetActiveProject(project)}
+                  >
                     <TableCell>
-                      <div className="font-medium">{project.title}</div>
-                      <div className="text-sm text-slate-500">{project.description}</div>
+                      <div className="flex items-center">
+                        <div>
+                          <div className="font-medium flex items-center">
+                            {project.title}
+                            {activeProject?.id === project.id && (
+                              <Badge variant="default" className="ml-2 text-xs">
+                                Active
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-slate-500">{project.description}</div>
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(project.status)}>
@@ -289,17 +306,17 @@ const ProjectManagement = ({
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button 
+                            variant="ghost" 
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <span className="sr-only">Open menu</span>
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleSetActiveProject(project)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            <span>Edit</span>
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => navigator.clipboard.writeText(JSON.stringify(project))}>
                             <Copy className="h-4 w-4 mr-2" />
                             <span>Copy</span>

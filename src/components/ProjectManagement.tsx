@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoreVertical, Edit, Copy, Trash, Plus, ArrowRight, CheckCircle, AlertCircle, RotateCw } from "lucide-react";
 import {
   AlertDialog,
@@ -38,6 +39,7 @@ import { ApiService } from "@/services/apiService";
 import { Project, ProjectStatus } from "@/types/database";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { SurveyManagement } from "./SurveyManagement";
 
 interface ProjectManagementProps {
   isAuthenticated: boolean;
@@ -349,57 +351,70 @@ const ProjectManagement = ({
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Title</Label>
-                <Input type="text" value={activeProject.title} readOnly />
-              </div>
-              <div>
-                <Label>Status</Label>
-                <Select value={activeProject.status} onValueChange={(value: ProjectStatus) => handleStatusChange(activeProject, value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="paused">Paused</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-2">
-                <Label>Description</Label>
-                <Textarea value={activeProject.description} readOnly />
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end space-x-2">
-              {activeProject.external_id ? (
-                <Badge variant="outline">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Synced to Dynata
-                </Badge>
-              ) : (
-                <Button 
-                  variant="outline"
-                  onClick={() => handleSyncToDynata(activeProject)}
-                  disabled={syncingProjectId === activeProject.id}
-                >
-                  {syncingProjectId === activeProject.id ? (
-                    <>
-                      <RotateCw className="h-4 w-4 mr-2 animate-spin" />
-                      Syncing...
-                    </>
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList>
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="surveys">Surveys</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Title</Label>
+                    <Input type="text" value={activeProject.title} readOnly />
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Select value={activeProject.status} onValueChange={(value: ProjectStatus) => handleStatusChange(activeProject, value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="paused">Paused</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Description</Label>
+                    <Textarea value={activeProject.description} readOnly />
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end space-x-2">
+                  {activeProject.external_id ? (
+                    <Badge variant="outline">
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Synced to Dynata
+                    </Badge>
                   ) : (
-                    <>
-                      <ArrowRight className="h-4 w-4 mr-2" />
-                      Sync to Dynata
-                    </>
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleSyncToDynata(activeProject)}
+                      disabled={syncingProjectId === activeProject.id}
+                    >
+                      {syncingProjectId === activeProject.id ? (
+                        <>
+                          <RotateCw className="h-4 w-4 mr-2 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRight className="h-4 w-4 mr-2" />
+                          Sync to Dynata
+                        </>
+                      )}
+                    </Button>
                   )}
-                </Button>
-              )}
-            </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="surveys">
+                <SurveyManagement project={activeProject} />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       )}

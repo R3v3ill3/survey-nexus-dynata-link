@@ -477,6 +477,113 @@ export type Database = {
           },
         ]
       }
+      survey_line_items: {
+        Row: {
+          created_at: string | null
+          id: string
+          line_item_id: string
+          priority: number | null
+          survey_id: string
+          survey_quota: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          line_item_id: string
+          priority?: number | null
+          survey_id: string
+          survey_quota?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          line_item_id?: string
+          priority?: number | null
+          survey_id?: string
+          survey_quota?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_line_items_line_item_id_fkey"
+            columns: ["line_item_id"]
+            isOneToOne: false
+            referencedRelation: "line_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "survey_line_items_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      surveys: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          estimated_length: number | null
+          external_platform: string
+          external_survey_id: string
+          id: string
+          import_metadata: Json | null
+          project_id: string
+          quota_requirements: Json | null
+          redirect_urls: Json | null
+          status: string | null
+          survey_questions: Json | null
+          survey_url: string
+          target_audience: Json | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          estimated_length?: number | null
+          external_platform?: string
+          external_survey_id: string
+          id?: string
+          import_metadata?: Json | null
+          project_id: string
+          quota_requirements?: Json | null
+          redirect_urls?: Json | null
+          status?: string | null
+          survey_questions?: Json | null
+          survey_url: string
+          target_audience?: Json | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          estimated_length?: number | null
+          external_platform?: string
+          external_survey_id?: string
+          id?: string
+          import_metadata?: Json | null
+          project_id?: string
+          quota_requirements?: Json | null
+          redirect_urls?: Json | null
+          status?: string | null
+          survey_questions?: Json | null
+          survey_url?: string
+          target_audience?: Json | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "surveys_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

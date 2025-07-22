@@ -210,3 +210,31 @@ export interface ApiCredentials {
   created_at: string;
   updated_at: string;
 }
+
+export interface Survey {
+  id: string;
+  project_id: string;
+  external_survey_id: string;
+  title: string;
+  description?: string;
+  estimated_length?: number;
+  survey_url: string;
+  status: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
+  target_audience: Record<string, any>;
+  quota_requirements: Record<string, any>;
+  survey_questions: Array<any>;
+  redirect_urls: Record<string, any>;
+  external_platform: string;
+  import_metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SurveyLineItem {
+  id: string;
+  survey_id: string;
+  line_item_id: string;
+  survey_quota: number;
+  priority: number;
+  created_at: string;
+}

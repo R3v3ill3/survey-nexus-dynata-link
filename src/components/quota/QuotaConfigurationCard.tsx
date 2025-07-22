@@ -9,9 +9,10 @@ import { QuotaConfiguration } from "@/types/database";
 interface QuotaConfigurationCardProps {
   quotaConfig: QuotaConfiguration | null;
   onConfigureClick: () => void;
+  configureButton?: React.ReactNode;
 }
 
-const QuotaConfigurationCard = ({ quotaConfig, onConfigureClick }: QuotaConfigurationCardProps) => {
+const QuotaConfigurationCard = ({ quotaConfig, onConfigureClick, configureButton }: QuotaConfigurationCardProps) => {
   const getComplexityBadge = (level: string) => {
     const colors = {
       low: "bg-green-100 text-green-800",
@@ -84,10 +85,12 @@ const QuotaConfigurationCard = ({ quotaConfig, onConfigureClick }: QuotaConfigur
             <CardTitle>Quota Management Overview</CardTitle>
             <CardDescription>Australian demographic targeting and quota fulfillment</CardDescription>
           </div>
-          <Button onClick={onConfigureClick}>
-            <Settings className="h-4 w-4 mr-2" />
-            Configure Quotas
-          </Button>
+          {configureButton || (
+            <Button onClick={onConfigureClick}>
+              <Settings className="h-4 w-4 mr-2" />
+              Configure Quotas
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>

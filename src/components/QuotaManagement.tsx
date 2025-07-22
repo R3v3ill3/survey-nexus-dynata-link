@@ -2,8 +2,11 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Target } from "lucide-react";
+import { Target, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useMembershipTier } from "@/hooks/useMembershipTier";
+import { TierUpgradePrompt } from "./TierUpgradePrompt";
 import { ApiService } from "@/services/apiService";
 import { QuotaGeneratorService } from "@/services/quotaGeneratorService";
 import { 
@@ -36,8 +39,10 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
   const [loading, setLoading] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isQuotaConfigDialogOpen, setIsQuotaConfigDialogOpen] = useState(false);
+  const [hasQuotaAccess, setHasQuotaAccess] = useState<boolean | null>(null);
 
   const { toast } = useToast();
+  const { tierInfo, allTiers, checkPlatformAccess, canCreateLineItem } = useMembershipTier();
 
   useEffect(() => {
     if (activeProject?.id) {
@@ -57,6 +62,14 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
       };
     }
   }, [activeProject?.id]);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      const access = await checkPlatformAccess("quota_generator");
+      setHasQuotaAccess(access);
+    };
+    checkAccess();
+  }, [checkPlatformAccess]);
 
   const loadProjectData = async () => {
     if (!activeProject?.id) return;
@@ -199,6 +212,17 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
       return;
     }
 
+    // Check tier limits for line items
+    const canCreate = await canCreateLineItem(activeProject.id);
+    if (!canCreate) {
+      toast({
+        title: "Line Item Limit Reached",
+        description: `You've reached your tier's line item limit for this project. Please upgrade to create more line items.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       const targeting = {
@@ -265,10 +289,18 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
         </TabsList>
 
         <TabsContent value="overview">
-          <QuotaConfigurationCard 
-            quotaConfig={quotaConfig} 
-            onConfigureClick={() => setIsQuotaConfigDialogOpen(true)}
-          />
+            <QuotaConfigurationCard 
+              quotaConfig={quotaConfig}
+              onConfigureClick={() => setIsQuotaConfigDialogOpen(true)}
+              configureButton={
+                <QuotaGeneratorButton 
+                  onGenerateClick={() => setIsQuotaConfigDialogOpen(true)} 
+                  hasAccess={hasQuotaAccess}
+                  tierInfo={tierInfo}
+                  allTiers={allTiers}
+                />
+              }
+            />
         </TabsContent>
 
         <TabsContent value="segments">
@@ -283,6 +315,8 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
             lineItems={lineItems}
             loading={loading}
             onCreateClick={() => setIsCreateDialogOpen(true)}
+            tierInfo={tierInfo}
+            projectId={activeProject.id}
           />
         </TabsContent>
       </Tabs>
@@ -301,6 +335,51 @@ const QuotaManagement = ({ activeProject }: QuotaManagementProps) => {
         loading={loading}
       />
     </div>
+  );
+};
+
+// Quota Generator Button Component
+interface QuotaGeneratorButtonProps {
+  onGenerateClick: () => void;
+  hasAccess: boolean | null;
+  tierInfo: any;
+  allTiers: any[];
+}
+
+const QuotaGeneratorButton = ({ 
+  onGenerateClick, 
+  hasAccess, 
+  tierInfo, 
+  allTiers 
+}: QuotaGeneratorButtonProps) => {
+  if (hasAccess === null) {
+    return (
+      <Button disabled>
+        <Zap className="h-4 w-4 mr-2" />
+        Checking access...
+      </Button>
+    );
+  }
+
+  if (!hasAccess && tierInfo) {
+    return (
+      <TierUpgradePrompt
+        currentTier={tierInfo.tier_name}
+        requiredFeature="quota_generator"
+        availableTiers={allTiers}
+        onUpgrade={(tier) => {
+          console.log("Upgrade to tier:", tier);
+          // TODO: Implement upgrade flow
+        }}
+      />
+    );
+  }
+
+  return (
+    <Button onClick={onGenerateClick}>
+      <Zap className="h-4 w-4 mr-2" />
+      Generate Quotas
+    </Button>
   );
 };
 

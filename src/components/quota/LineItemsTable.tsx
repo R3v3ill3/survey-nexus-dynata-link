@@ -11,9 +11,11 @@ interface LineItemsTableProps {
   lineItems: LineItem[];
   loading: boolean;
   onCreateClick: () => void;
+  tierInfo?: any;
+  projectId?: string;
 }
 
-const LineItemsTable = ({ lineItems, loading, onCreateClick }: LineItemsTableProps) => {
+const LineItemsTable = ({ lineItems, loading, onCreateClick, tierInfo, projectId }: LineItemsTableProps) => {
   const getStatusColor = (status: LineItem["status"]) => {
     switch (status) {
       case "active": return "bg-green-100 text-green-800";
@@ -49,10 +51,11 @@ const LineItemsTable = ({ lineItems, loading, onCreateClick }: LineItemsTablePro
               Define targeting criteria and monitor quota fulfillment across all channels
             </CardDescription>
           </div>
-          <Button onClick={onCreateClick} disabled={loading}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Line Item
-          </Button>
+          <LineItemCreateButton 
+            onCreateClick={onCreateClick}
+            tierInfo={tierInfo}
+            currentCount={lineItems.length}
+          />
         </div>
       </CardHeader>
       <CardContent>
@@ -117,6 +120,55 @@ const LineItemsTable = ({ lineItems, loading, onCreateClick }: LineItemsTablePro
         )}
       </CardContent>
     </Card>
+  );
+};
+
+// Line Item Create Button Component
+interface LineItemCreateButtonProps {
+  onCreateClick: () => void;
+  tierInfo?: any;
+  currentCount: number;
+}
+
+const LineItemCreateButton = ({ onCreateClick, tierInfo, currentCount }: LineItemCreateButtonProps) => {
+  if (!tierInfo) {
+    return (
+      <Button onClick={onCreateClick}>
+        <Plus className="h-4 w-4 mr-2" />
+        Create Line Item
+      </Button>
+    );
+  }
+
+  const maxLineItems = tierInfo.max_line_items_per_project;
+  const hasReachedLimit = maxLineItems !== -1 && currentCount >= maxLineItems;
+
+  if (hasReachedLimit) {
+    return (
+      <div className="text-center">
+        <div className="text-sm text-muted-foreground mb-2">
+          Line item limit reached ({currentCount}/{maxLineItems})
+        </div>
+        <Button disabled variant="outline">
+          <Plus className="h-4 w-4 mr-2" />
+          Create Line Item
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {maxLineItems !== -1 && (
+        <div className="text-sm text-muted-foreground mb-2">
+          Line items: {currentCount}/{maxLineItems}
+        </div>
+      )}
+      <Button onClick={onCreateClick}>
+        <Plus className="h-4 w-4 mr-2" />
+        Create Line Item
+      </Button>
+    </div>
   );
 };
 

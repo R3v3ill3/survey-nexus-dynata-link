@@ -103,6 +103,63 @@ export type Database = {
           },
         ]
       }
+      membership_tiers: {
+        Row: {
+          api_rate_limit: number | null
+          created_at: string | null
+          description: string | null
+          dynata_api_access: boolean | null
+          features: Json | null
+          id: string
+          max_line_items_per_project: number | null
+          max_projects: number | null
+          monthly_price: number | null
+          name: string
+          quota_generator_access: boolean | null
+          support_level: string | null
+          survey_generator_access: boolean | null
+          tier: Database["public"]["Enums"]["membership_tier"]
+          updated_at: string | null
+          yearly_price: number | null
+        }
+        Insert: {
+          api_rate_limit?: number | null
+          created_at?: string | null
+          description?: string | null
+          dynata_api_access?: boolean | null
+          features?: Json | null
+          id?: string
+          max_line_items_per_project?: number | null
+          max_projects?: number | null
+          monthly_price?: number | null
+          name: string
+          quota_generator_access?: boolean | null
+          support_level?: string | null
+          survey_generator_access?: boolean | null
+          tier: Database["public"]["Enums"]["membership_tier"]
+          updated_at?: string | null
+          yearly_price?: number | null
+        }
+        Update: {
+          api_rate_limit?: number | null
+          created_at?: string | null
+          description?: string | null
+          dynata_api_access?: boolean | null
+          features?: Json | null
+          id?: string
+          max_line_items_per_project?: number | null
+          max_projects?: number | null
+          monthly_price?: number | null
+          name?: string
+          quota_generator_access?: boolean | null
+          support_level?: string | null
+          survey_generator_access?: boolean | null
+          tier?: Database["public"]["Enums"]["membership_tier"]
+          updated_at?: string | null
+          yearly_price?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -110,6 +167,11 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          membership_tier: Database["public"]["Enums"]["membership_tier"] | null
+          platform_permissions: Json | null
+          stripe_customer_id: string | null
+          subscription_expires_at: string | null
+          subscription_status: string | null
           updated_at: string | null
         }
         Insert: {
@@ -118,6 +180,13 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          membership_tier?:
+            | Database["public"]["Enums"]["membership_tier"]
+            | null
+          platform_permissions?: Json | null
+          stripe_customer_id?: string | null
+          subscription_expires_at?: string | null
+          subscription_status?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -126,6 +195,13 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          membership_tier?:
+            | Database["public"]["Enums"]["membership_tier"]
+            | null
+          platform_permissions?: Json | null
+          stripe_customer_id?: string | null
+          subscription_expires_at?: string | null
+          subscription_status?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -584,12 +660,75 @@ export type Database = {
           },
         ]
       }
+      user_platform_access: {
+        Row: {
+          access_token: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          last_accessed: string | null
+          platform_name: string
+          refresh_token: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_accessed?: string | null
+          platform_name: string
+          refresh_token?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_accessed?: string | null
+          platform_name?: string
+          refresh_token?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_platform_access_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_tier_info: {
+        Args: { user_id: string }
+        Returns: {
+          tier: Database["public"]["Enums"]["membership_tier"]
+          tier_name: string
+          max_projects: number
+          max_line_items_per_project: number
+          quota_generator_access: boolean
+          survey_generator_access: boolean
+          dynata_api_access: boolean
+          features: Json
+        }[]
+      }
+      has_platform_access: {
+        Args: { user_id: string; platform: string }
+        Returns: boolean
+      }
     }
     Enums: {
       channel_type: "dynata" | "sms" | "voice"
@@ -600,6 +739,7 @@ export type Database = {
         | "completed"
         | "overquota"
         | "cancelled"
+      membership_tier: "free" | "professional" | "enterprise" | "admin"
       project_status: "draft" | "active" | "paused" | "completed" | "cancelled"
       response_status:
         | "complete"
@@ -743,6 +883,7 @@ export const Constants = {
         "overquota",
         "cancelled",
       ],
+      membership_tier: ["free", "professional", "enterprise", "admin"],
       project_status: ["draft", "active", "paused", "completed", "cancelled"],
       response_status: [
         "complete",

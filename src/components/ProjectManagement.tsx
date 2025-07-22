@@ -40,6 +40,8 @@ import { Project, ProjectStatus } from "@/types/database";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SurveyManagement } from "./SurveyManagement";
+import { useMembershipTier } from "@/hooks/useMembershipTier";
+import { TierUpgradePrompt } from "./TierUpgradePrompt";
 
 interface ProjectManagementProps {
   isAuthenticated: boolean;
@@ -63,6 +65,7 @@ const ProjectManagement = ({
   const [syncingProjectId, setSyncingProjectId] = useState<string | null>(null);
 
   const { toast } = useToast();
+  const { tierInfo, allTiers, canCreateProject } = useMembershipTier();
 
   useEffect(() => {
     loadProjects();
@@ -86,6 +89,17 @@ const ProjectManagement = ({
   };
 
   const handleCreateProject = async (data: { title: string; description: string }) => {
+    // Check if user can create more projects
+    const canCreate = await canCreateProject();
+    if (!canCreate) {
+      toast({
+        title: "Project Limit Reached",
+        description: `You've reached your tier's project limit. Please upgrade to create more projects.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsCreating(true);
     try {
       const newProject = await ApiService.createLocalProject(
@@ -248,13 +262,22 @@ const ProjectManagement = ({
           <div className="flex items-center justify-between">
             <CardTitle>Project Management</CardTitle>
             <CardDescription>Create and manage your polling projects</CardDescription>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Project
-            </Button>
+            <CreateProjectButton onCreateClick={() => setIsCreateDialogOpen(true)} />
           </div>
         </CardHeader>
         <CardContent>
+          {tierInfo && (
+            <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium">Current Plan: {tierInfo.tier_name}</span>
+                  <span className="text-sm text-muted-foreground ml-2">
+                    ({projects.length}/{tierInfo.max_projects === -1 ? '∞' : tierInfo.max_projects} projects)
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
           {isLoading ? (
             <div className="text-center py-8">
               Loading projects...
@@ -499,6 +522,41 @@ const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onSubmit, isCreat
         )}
       </Button>
     </form>
+  );
+};
+
+// Create Project Button Component
+const CreateProjectButton = ({ onCreateClick }: { onCreateClick: () => void }) => {
+  const { tierInfo, canCreateProject, allTiers } = useMembershipTier();
+  const [canCreate, setCanCreate] = useState(true);
+
+  useEffect(() => {
+    const checkCanCreate = async () => {
+      const canCreateResult = await canCreateProject();
+      setCanCreate(canCreateResult);
+    };
+    checkCanCreate();
+  }, [canCreateProject]);
+
+  if (!canCreate && tierInfo) {
+    return (
+      <TierUpgradePrompt
+        currentTier={tierInfo.tier_name}
+        requiredFeature="more_projects"
+        availableTiers={allTiers}
+        onUpgrade={(tier) => {
+          console.log("Upgrade to tier:", tier);
+          // TODO: Implement upgrade flow
+        }}
+      />
+    );
+  }
+
+  return (
+    <Button onClick={onCreateClick}>
+      <Plus className="h-4 w-4 mr-2" />
+      Create Project
+    </Button>
   );
 };
 

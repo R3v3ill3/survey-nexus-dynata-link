@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Loader2 } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { Plus, Loader2, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
+import { SurveyGeneratorDialog } from "./SurveyGeneratorDialog"
 import type { Project } from "@/types/database"
 
 interface ImportSurveyDialogProps {
@@ -111,117 +113,142 @@ export function ImportSurveyDialog({ project, onSurveyImported }: ImportSurveyDi
         <DialogHeader>
           <DialogTitle>Import Survey</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div className="space-y-6">
+          {/* Survey Generator Integration */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-medium">Import from Survey Generator</h3>
+              <p className="text-sm text-muted-foreground">
+                Connect to Survey Generator to import surveys directly
+              </p>
+            </div>
+            <SurveyGeneratorDialog project={project} onSurveyImported={onSurveyImported} />
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <Separator className="w-full" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                Or import manually
+              </span>
+            </div>
+          </div>
+
+          {/* Manual Import Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="external_survey_id">External Survey ID *</Label>
+                <Input
+                  id="external_survey_id"
+                  value={formData.external_survey_id}
+                  onChange={(e) => handleInputChange('external_survey_id', e.target.value)}
+                  placeholder="e.g., SURV_123456"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="external_platform">Platform</Label>
+                <Select
+                  value={formData.external_platform}
+                  onValueChange={(value) => handleInputChange('external_platform', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="external">External Platform</SelectItem>
+                    <SelectItem value="qualtrics">Qualtrics</SelectItem>
+                    <SelectItem value="surveymonkey">SurveyMonkey</SelectItem>
+                    <SelectItem value="typeform">Typeform</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="external_survey_id">External Survey ID *</Label>
+              <Label htmlFor="title">Survey Title *</Label>
               <Input
-                id="external_survey_id"
-                value={formData.external_survey_id}
-                onChange={(e) => handleInputChange('external_survey_id', e.target.value)}
-                placeholder="e.g., SURV_123456"
+                id="title"
+                value={formData.title}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                placeholder="Enter survey title"
                 required
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="external_platform">Platform</Label>
-              <Select
-                value={formData.external_platform}
-                onValueChange={(value) => handleInputChange('external_platform', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="external">External Platform</SelectItem>
-                  <SelectItem value="survey_generator">Survey Generator</SelectItem>
-                  <SelectItem value="qualtrics">Qualtrics</SelectItem>
-                  <SelectItem value="surveymonkey">SurveyMonkey</SelectItem>
-                  <SelectItem value="typeform">Typeform</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="title">Survey Title *</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
-              placeholder="Enter survey title"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              placeholder="Brief description of the survey"
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="estimated_length">Estimated Length (minutes)</Label>
-              <Input
-                id="estimated_length"
-                type="number"
-                value={formData.estimated_length}
-                onChange={(e) => handleInputChange('estimated_length', e.target.value)}
-                placeholder="e.g., 15"
-                min="1"
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                placeholder="Brief description of the survey"
+                rows={3}
               />
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="estimated_length">Estimated Length (minutes)</Label>
+                <Input
+                  id="estimated_length"
+                  type="number"
+                  value={formData.estimated_length}
+                  onChange={(e) => handleInputChange('estimated_length', e.target.value)}
+                  placeholder="e.g., 15"
+                  min="1"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="survey_url">Survey URL *</Label>
+                <Input
+                  id="survey_url"
+                  type="url"
+                  value={formData.survey_url}
+                  onChange={(e) => handleInputChange('survey_url', e.target.value)}
+                  placeholder="https://example.com/survey"
+                  required
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="survey_url">Survey URL *</Label>
-              <Input
-                id="survey_url"
-                type="url"
-                value={formData.survey_url}
-                onChange={(e) => handleInputChange('survey_url', e.target.value)}
-                placeholder="https://example.com/survey"
-                required
+              <Label htmlFor="target_audience">Target Audience (JSON)</Label>
+              <Textarea
+                id="target_audience"
+                value={formData.target_audience}
+                onChange={(e) => handleInputChange('target_audience', e.target.value)}
+                placeholder='{"age_range": "18-65", "location": "US"}'
+                rows={2}
               />
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="target_audience">Target Audience (JSON)</Label>
-            <Textarea
-              id="target_audience"
-              value={formData.target_audience}
-              onChange={(e) => handleInputChange('target_audience', e.target.value)}
-              placeholder='{"age_range": "18-65", "location": "US"}'
-              rows={2}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="quota_requirements">Quota Requirements (JSON)</Label>
+              <Textarea
+                id="quota_requirements"
+                value={formData.quota_requirements}
+                onChange={(e) => handleInputChange('quota_requirements', e.target.value)}
+                placeholder='{"total_responses": 1000, "demographics": {...}}'
+                rows={2}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="quota_requirements">Quota Requirements (JSON)</Label>
-            <Textarea
-              id="quota_requirements"
-              value={formData.quota_requirements}
-              onChange={(e) => handleInputChange('quota_requirements', e.target.value)}
-              placeholder='{"total_responses": 1000, "demographics": {...}}'
-              rows={2}
-            />
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Import Survey
-            </Button>
-          </div>
-        </form>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Import Survey
+              </Button>
+            </div>
+          </form>
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -20,7 +20,7 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
   const [open, setOpen] = useState(false)
   const [selectedSurvey, setSelectedSurvey] = useState<string | null>(null)
   const { surveys, loading, hasAccess, fetchSurveys, importSurvey, authenticateWithSurveyGenerator } = useSurveyGenerator()
-  const { membershipTier, availableTiers } = useMembershipTier()
+  const { tierInfo, allTiers } = useMembershipTier()
 
   useEffect(() => {
     if (open && hasAccess) {
@@ -53,7 +53,7 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
   }
 
   // Check if user has access to Survey Generator
-  const hasSurveyGeneratorAccess = membershipTier?.survey_generator_access
+  const hasSurveyGeneratorAccess = tierInfo?.survey_generator_access
 
   if (!hasSurveyGeneratorAccess) {
     return (
@@ -69,9 +69,9 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
             <DialogTitle>Survey Generator Access Required</DialogTitle>
           </DialogHeader>
           <TierUpgradePrompt
-            currentTier={membershipTier?.tier}
+            currentTier={tierInfo?.tier}
             requiredFeature="survey_generator"
-            availableTiers={availableTiers}
+            availableTiers={allTiers}
           />
         </DialogContent>
       </Dialog>

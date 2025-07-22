@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { supabase } from "@/integrations/supabase/client"
@@ -5,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, ExternalLink, Clock, Users, Target } from "lucide-react"
+import { ExternalLink, Clock, Users, Target, Settings, Play, Pause, Square } from "lucide-react"
 import { toast } from "sonner"
+import { ImportSurveyDialog } from "./survey/ImportSurveyDialog"
 import type { Project } from "@/types/database"
 
 interface Survey {
@@ -81,6 +83,20 @@ export function SurveyManagement({ project }: SurveyManagementProps) {
     return `${minutes} min${minutes !== 1 ? 's' : ''}`
   }
 
+  const handleStatusChange = async (surveyId: string, newStatus: string) => {
+    // TODO: Implement survey status change functionality
+    toast.info(`Survey status change to ${newStatus} - Coming soon!`)
+  }
+
+  const handleViewSurvey = (survey: Survey) => {
+    window.open(survey.survey_url, '_blank')
+  }
+
+  const handleConfigureSurvey = (survey: Survey) => {
+    // TODO: Implement survey configuration dialog
+    toast.info('Survey configuration - Coming soon!')
+  }
+
   if (loading) {
     return (
       <Card>
@@ -100,10 +116,10 @@ export function SurveyManagement({ project }: SurveyManagementProps) {
             Import and manage surveys from external platforms
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Import Survey
-        </Button>
+        <ImportSurveyDialog 
+          project={project} 
+          onSurveyImported={fetchSurveys}
+        />
       </div>
 
       <Tabs defaultValue="all" className="w-full">
@@ -122,10 +138,10 @@ export function SurveyManagement({ project }: SurveyManagementProps) {
                 <p className="text-muted-foreground text-center mb-4">
                   Connect your survey platform to import surveys and manage quotas
                 </p>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Import Your First Survey
-                </Button>
+                <ImportSurveyDialog 
+                  project={project} 
+                  onSurveyImported={fetchSurveys}
+                />
               </CardContent>
             </Card>
           ) : (
@@ -150,14 +166,28 @@ export function SurveyManagement({ project }: SurveyManagementProps) {
                           </p>
                         )}
                       </div>
-                      <Button variant="outline" size="sm">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        View Survey
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleViewSurvey(survey)}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View Survey
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleConfigureSurvey(survey)}
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          Configure
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-4 w-4" />
                         <span>{formatDuration(survey.estimated_length)}</span>
@@ -175,8 +205,42 @@ export function SurveyManagement({ project }: SurveyManagementProps) {
                       </div>
                     </div>
                     
+                    {/* Survey Status Controls */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-sm font-medium">Status:</span>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant={survey.status === 'active' ? 'default' : 'outline'}
+                          onClick={() => handleStatusChange(survey.id, 'active')}
+                          disabled={survey.status === 'active'}
+                        >
+                          <Play className="h-3 w-3 mr-1" />
+                          Active
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={survey.status === 'paused' ? 'default' : 'outline'}
+                          onClick={() => handleStatusChange(survey.id, 'paused')}
+                          disabled={survey.status === 'paused'}
+                        >
+                          <Pause className="h-3 w-3 mr-1" />
+                          Paused
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={survey.status === 'cancelled' ? 'destructive' : 'outline'}
+                          onClick={() => handleStatusChange(survey.id, 'cancelled')}
+                          disabled={survey.status === 'cancelled'}
+                        >
+                          <Square className="h-3 w-3 mr-1" />
+                          Stop
+                        </Button>
+                      </div>
+                    </div>
+                    
                     {survey.survey_line_items && survey.survey_line_items.length > 0 && (
-                      <div className="mt-4 pt-4 border-t">
+                      <div className="pt-4 border-t">
                         <h4 className="font-medium mb-2">Connected Line Items</h4>
                         <div className="space-y-1">
                           {survey.survey_line_items.map((lineItem) => (
@@ -208,10 +272,17 @@ export function SurveyManagement({ project }: SurveyManagementProps) {
                     <CardTitle>{survey.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">Active survey content...</p>
+                    <p className="text-muted-foreground">Active survey details...</p>
                   </CardContent>
                 </Card>
               ))}
+            {surveys.filter(survey => survey.status === 'active').length === 0 && (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <p className="text-muted-foreground">No active surveys</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 
@@ -225,10 +296,17 @@ export function SurveyManagement({ project }: SurveyManagementProps) {
                     <CardTitle>{survey.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">Draft survey content...</p>
+                    <p className="text-muted-foreground">Draft survey details...</p>
                   </CardContent>
                 </Card>
               ))}
+            {surveys.filter(survey => survey.status === 'draft').length === 0 && (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <p className="text-muted-foreground">No draft surveys</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
       </Tabs>

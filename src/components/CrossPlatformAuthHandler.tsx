@@ -14,7 +14,38 @@ export const CrossPlatformAuthHandler = () => {
     const handleCrossPlatformAuth = async () => {
       const token = searchParams.get('token')
       const platform = searchParams.get('platform')
+      const code = searchParams.get('code')
+      const state = searchParams.get('state')
       
+      // Handle Survey Generator OAuth callback
+      if (code && state) {
+        try {
+          const { data: exchangeData, error: exchangeError } = await supabase.functions.invoke('survey-generator-api', {
+            body: {
+              action: 'exchange_code',
+              code,
+              state,
+              callback_url: `${window.location.origin}/auth`
+            }
+          })
+
+          if (exchangeError || !exchangeData.success) {
+            throw new Error('Failed to exchange authorization code')
+          }
+
+          toast.success('Successfully connected to Survey Generator!')
+          navigate('/', { replace: true })
+          return
+
+        } catch (error) {
+          console.error('OAuth callback error:', error)
+          toast.error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+          navigate('/', { replace: true })
+          return
+        }
+      }
+
+      // Handle existing cross-platform auth flow
       if (!token || !platform) return
 
       try {

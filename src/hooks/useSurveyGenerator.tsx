@@ -64,42 +64,19 @@ export const useSurveyGenerator = () => {
         throw new Error('No Survey Generator access found. Please authenticate first.')
       }
 
-      // In a real implementation, this would call the Survey Generator API
-      // For now, we'll simulate the API call
-      const mockSurveys: SurveyGeneratorSurvey[] = [
-        {
-          id: 'sg_001',
-          title: 'Customer Satisfaction Survey',
-          description: 'Monthly customer satisfaction tracking',
-          estimated_length: 10,
-          survey_url: 'https://survey-generator.com/survey/sg_001',
-          status: 'draft',
-          created_at: new Date().toISOString(),
-          questions: [
-            { id: 1, type: 'rating', question: 'How satisfied are you with our service?' },
-            { id: 2, type: 'text', question: 'What improvements would you suggest?' }
-          ],
-          target_audience: { age_range: '18-65', location: 'US' },
-          quota_requirements: { total_responses: 500 }
-        },
-        {
-          id: 'sg_002',
-          title: 'Product Feedback Survey',
-          description: 'Gather feedback on new product features',
-          estimated_length: 15,
-          survey_url: 'https://survey-generator.com/survey/sg_002',
-          status: 'active',
-          created_at: new Date().toISOString(),
-          questions: [
-            { id: 1, type: 'multiple_choice', question: 'Which feature do you use most?' },
-            { id: 2, type: 'rating', question: 'Rate the new dashboard design' }
-          ],
-          target_audience: { age_range: '25-54', location: 'US,CA' },
-          quota_requirements: { total_responses: 1000 }
+      // Call the Survey Generator API through our edge function
+      const { data: surveysData, error: surveysError } = await supabase.functions.invoke('survey-generator-api', {
+        body: {
+          action: 'fetch_surveys',
+          access_token: platformAccess.access_token
         }
-      ]
+      })
 
-      setSurveys(mockSurveys)
+      if (surveysError) {
+        throw new Error('Failed to fetch surveys from Survey Generator')
+      }
+
+      setSurveys(surveysData.surveys || [])
     } catch (error) {
       console.error('Error fetching Survey Generator surveys:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to fetch surveys')
@@ -154,36 +131,25 @@ export const useSurveyGenerator = () => {
     if (!user) return
 
     try {
-      // In a real implementation, this would redirect to Survey Generator OAuth flow
-      // For now, we'll simulate the authentication
-      const mockAuthData = {
-        access_token: 'sg_token_' + Date.now(),
-        expires_at: new Date(Date.now() + 3600000).toISOString(), // 1 hour
-        user_data: {
-          id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || user.email,
-          platform_permissions: {
-            survey_generator: true
-          }
+      // Generate auth URL with the Survey Generator platform
+      const { data: authData, error: authError } = await supabase.functions.invoke('survey-generator-api', {
+        body: {
+          action: 'generate_auth_url',
+          user_id: user.id,
+          callback_url: `${window.location.origin}/auth`
         }
+      })
+
+      if (authError) {
+        throw new Error('Failed to generate authentication URL')
       }
 
-      // Store platform access
-      const { error } = await supabase
-        .from('user_platform_access')
-        .upsert({
-          user_id: user.id,
-          platform_name: 'survey_generator',
-          access_token: mockAuthData.access_token,
-          expires_at: mockAuthData.expires_at,
-          is_active: true
-        })
-
-      if (error) throw error
-
-      setHasAccess(true)
-      toast.success('Successfully authenticated with Survey Generator!')
+      // Redirect to Survey Generator OAuth flow
+      if (authData.auth_url) {
+        window.location.href = authData.auth_url
+      } else {
+        throw new Error('No authentication URL received')
+      }
     } catch (error) {
       console.error('Error authenticating with Survey Generator:', error)
       toast.error('Failed to authenticate with Survey Generator')

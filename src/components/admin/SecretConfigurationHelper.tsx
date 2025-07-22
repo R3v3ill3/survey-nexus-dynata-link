@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 export const SecretConfigurationHelper = () => {
   const [syncToken, setSyncToken] = useState('')
   const [isTokenGenerated, setIsTokenGenerated] = useState(false)
+  const [surveyGeneratorUrl, setSurveyGeneratorUrl] = useState('https://wxbmorjrasmvzielzznn.supabase.co')
 
   const handleGenerateToken = () => {
     const token = generateSecureSyncToken()
@@ -116,6 +117,28 @@ export const SecretConfigurationHelper = () => {
                   </Button>
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Label>Secret Name: SURVEY_GENERATOR_URL</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={surveyGeneratorUrl}
+                    onChange={(e) => setSurveyGeneratorUrl(e.target.value)}
+                    className="font-mono text-sm"
+                    placeholder="https://survey-generator-base-url.com"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCopyToClipboard(surveyGeneratorUrl, 'Survey Generator URL')}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Base URL of the Survey Generator platform (without trailing slash)
+                </p>
+              </div>
             </div>
           </div>
 
@@ -177,6 +200,14 @@ export const SecretConfigurationHelper = () => {
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
+                  </div>
+                </div>
+                
+                <div className="p-4 bg-muted rounded-lg">
+                  <h4 className="font-medium mb-2">Survey Generator Endpoints</h4>
+                  <div className="space-y-2 text-sm">
+                    <div><strong>Sync Endpoint:</strong> https://wxbmorjrasmvzielzznn.supabase.co/functions/v1/sync-to-survey-generator</div>
+                    <div><strong>Auth Endpoint:</strong> https://wxbmorjrasmvzielzznn.supabase.co/functions/v1/cross-platform-auth</div>
                   </div>
                 </div>
                 

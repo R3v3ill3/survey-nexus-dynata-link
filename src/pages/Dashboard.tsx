@@ -1,11 +1,30 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Folder, Calendar, Activity } from "lucide-react";
+import { Plus, Folder, Calendar, Activity, MoreVertical, Trash } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ApiService } from "@/services/apiService";
 
 interface Project {
   id: string;
@@ -21,6 +40,8 @@ const Dashboard = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -113,6 +134,30 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+
+    try {
+      await ApiService.deleteLocalProject(projectToDelete.id);
+      setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+      
+      toast({
+        title: "Project Deleted",
+        description: `Project "${projectToDelete.title}" has been deleted successfully.`,
+      });
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete project. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setProjectToDelete(null);
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -176,11 +221,10 @@ const Dashboard = () => {
               <Card 
                 key={project.id}
                 className="hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => navigate(`/project/${project.id}`)}
               >
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                    <div className="flex-1" onClick={() => navigate(`/project/${project.id}`)}>
                       <CardTitle className="text-lg line-clamp-1">
                         {project.title}
                       </CardTitle>
@@ -188,11 +232,40 @@ const Dashboard = () => {
                         {project.description || "No description"}
                       </CardDescription>
                     </div>
-                    <span 
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}
-                    >
-                      {project.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span 
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}
+                      >
+                        {project.status}
+                      </span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span className="sr-only">Open menu</span>
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProjectToDelete(project);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash className="h-4 w-4 mr-2" />
+                            <span>Delete</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -212,6 +285,23 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
+      {/* Delete Project Alert Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the project
+              "{projectToDelete?.title}" and remove all of its data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

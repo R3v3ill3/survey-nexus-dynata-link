@@ -211,7 +211,7 @@ const ProjectManagement = ({
     if (!projectToDelete) return;
 
     try {
-      // const deletedProject = await ApiService.deleteProject(projectToDelete.id);
+      await ApiService.deleteLocalProject(projectToDelete.id);
       setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
       
       if (activeProject?.id === projectToDelete.id) {

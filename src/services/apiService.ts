@@ -69,6 +69,21 @@ export class ApiService {
     return data as Project[];
   }
 
+  static async deleteLocalProject(projectId: string) {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Authentication required');
+
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId)
+      .eq('user_id', user.id); // Ensure user can only delete their own projects
+
+    if (error) throw error;
+    return { success: true };
+  }
+
   static async updateLocalProjectStatus(projectId: string, status: string) {
     const { data, error } = await supabase
       .from('projects')

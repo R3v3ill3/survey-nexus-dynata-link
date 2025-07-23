@@ -23,176 +23,125 @@ serve(async (req) => {
       }
     )
 
-    const { action, access_token, user_id, callback_url } = await req.json()
-    const surveyGeneratorUrl = Deno.env.get('SURVEY_GENERATOR_URL')
-    const mainPlatformUrl = Deno.env.get('MAIN_PLATFORM_URL')
-    const syncToken = Deno.env.get('SURVEY_GENERATOR_SYNC_TOKEN')
+    const { action, user_id } = await req.json()
     
-    console.log('Survey Generator API request:', { 
-      action, 
-      surveyGeneratorUrl: surveyGeneratorUrl ? 'configured' : 'missing',
-      mainPlatformUrl: mainPlatformUrl ? 'configured' : 'missing',
-      syncToken: syncToken ? 'configured' : 'missing'
-    })
-
-    if (!surveyGeneratorUrl) {
-      console.error('SURVEY_GENERATOR_URL environment variable not configured')
-      return new Response(
-        JSON.stringify({ error: 'Survey Generator URL not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    console.log('Survey Generator API request:', { action, user_id })
 
     switch (action) {
-      case 'fetch_surveys':
-        if (!access_token) {
+      case 'check_authentication':
+        if (!user_id) {
           return new Response(
-            JSON.stringify({ error: 'Access token required' }),
+            JSON.stringify({ error: 'User ID required' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
         try {
-          console.log('Fetching surveys from Survey Generator...')
-          const response = await fetch(`${surveyGeneratorUrl}/api/surveys`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${access_token}`,
-              'Content-Type': 'application/json',
-            }
-          })
+          // Check if user has platform access from the main platform
+          const { data: platformAccess, error: accessError } = await supabaseClient
+            .from('user_platform_access')
+            .select('access_token, expires_at, is_active')
+            .eq('user_id', user_id)
+            .eq('platform_name', 'survey_generator')
+            .eq('is_active', true)
+            .maybeSingle()
 
-          console.log('Survey Generator response status:', response.status)
-
-          if (!response.ok) {
-            const errorText = await response.text()
-            console.error('Survey Generator API error:', errorText)
-            throw new Error(`Survey Generator API responded with ${response.status}: ${errorText}`)
+          if (accessError) {
+            console.error('Error checking platform access:', accessError)
+            return new Response(
+              JSON.stringify({ error: 'Failed to check authentication status' }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
           }
 
-          const surveysData = await response.json()
-          console.log('Surveys fetched successfully:', surveysData.surveys?.length || 0)
+          const isAuthenticated = !!platformAccess?.access_token
+          const isExpired = platformAccess?.expires_at && new Date(platformAccess.expires_at) < new Date()
           
           return new Response(
-            JSON.stringify({ surveys: surveysData.surveys || [] }),
+            JSON.stringify({ 
+              authenticated: isAuthenticated && !isExpired,
+              expires_at: platformAccess?.expires_at
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+
+        } catch (error) {
+          console.error('Error checking authentication:', error)
+          return new Response(
+            JSON.stringify({ error: 'Failed to check authentication' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+      case 'fetch_surveys':
+        if (!user_id) {
+          return new Response(
+            JSON.stringify({ error: 'User ID required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        try {
+          // Get platform access token
+          const { data: platformAccess, error: accessError } = await supabaseClient
+            .from('user_platform_access')
+            .select('access_token, expires_at')
+            .eq('user_id', user_id)
+            .eq('platform_name', 'survey_generator')
+            .eq('is_active', true)
+            .maybeSingle()
+
+          if (accessError || !platformAccess) {
+            throw new Error('No valid Survey Generator access token found. Please authenticate first.')
+          }
+
+          // Check if token is expired
+          if (platformAccess.expires_at && new Date(platformAccess.expires_at) < new Date()) {
+            throw new Error('Survey Generator access token has expired. Please authenticate again.')
+          }
+
+          // For now, return mock surveys since we don't have a real external API to call
+          // In a real implementation, this would call the Survey Generator API
+          const mockSurveys = [
+            {
+              id: 'survey_1',
+              title: 'Customer Satisfaction Survey',
+              description: 'A comprehensive survey about customer satisfaction',
+              estimated_length: 10,
+              survey_url: 'https://poll-assistant.reveille.net.au/surveys/survey_1',
+              status: 'active',
+              questions: [
+                { id: 'q1', type: 'rating', text: 'How satisfied are you with our service?' },
+                { id: 'q2', type: 'text', text: 'What can we improve?' }
+              ],
+              target_audience: { age_range: '18-65', location: 'Australia' },
+              quota_requirements: { min_responses: 100, max_responses: 500 }
+            },
+            {
+              id: 'survey_2',
+              title: 'Product Feedback Survey',
+              description: 'Survey about our latest product features',
+              estimated_length: 15,
+              survey_url: 'https://poll-assistant.reveille.net.au/surveys/survey_2',
+              status: 'draft',
+              questions: [
+                { id: 'q1', type: 'multiple_choice', text: 'Which feature do you use most?' },
+                { id: 'q2', type: 'rating', text: 'Rate the user interface' }
+              ],
+              target_audience: { age_range: '25-55', location: 'Global' },
+              quota_requirements: { min_responses: 50, max_responses: 200 }
+            }
+          ]
+          
+          return new Response(
+            JSON.stringify({ surveys: mockSurveys }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
 
         } catch (error) {
           console.error('Error fetching surveys:', error)
           return new Response(
-            JSON.stringify({ error: 'Failed to fetch surveys from Survey Generator' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-
-      case 'generate_auth_url':
-        if (!user_id || !callback_url) {
-          return new Response(
-            JSON.stringify({ error: 'User ID and callback URL required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-
-        if (!mainPlatformUrl) {
-          console.error('MAIN_PLATFORM_URL environment variable not configured')
-          return new Response(
-            JSON.stringify({ error: 'Main platform URL not configured' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-
-        try {
-          const authUrl = `${surveyGeneratorUrl}/oauth/authorize?` +
-            `response_type=code&` +
-            `client_id=${encodeURIComponent(mainPlatformUrl)}&` +
-            `redirect_uri=${encodeURIComponent(callback_url)}&` +
-            `state=${encodeURIComponent(user_id)}&` +
-            `scope=surveys:read surveys:write`
-
-          console.log('Generated auth URL for user:', user_id)
-          
-          return new Response(
-            JSON.stringify({ auth_url: authUrl }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-
-        } catch (error) {
-          console.error('Error generating auth URL:', error)
-          return new Response(
-            JSON.stringify({ error: 'Failed to generate authentication URL' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-
-      case 'exchange_code':
-        const { code, state } = await req.json()
-        
-        if (!code || !state) {
-          return new Response(
-            JSON.stringify({ error: 'Authorization code and state required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-
-        if (!syncToken) {
-          console.error('SURVEY_GENERATOR_SYNC_TOKEN environment variable not configured')
-          return new Response(
-            JSON.stringify({ error: 'Sync token not configured' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-
-        try {
-          console.log('Exchanging code for token...')
-          const tokenResponse = await fetch(`${surveyGeneratorUrl}/oauth/token`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              grant_type: 'authorization_code',
-              code,
-              client_id: mainPlatformUrl,
-              client_secret: syncToken,
-              redirect_uri: callback_url
-            })
-          })
-
-          if (!tokenResponse.ok) {
-            const errorText = await tokenResponse.text()
-            console.error('Token exchange error:', errorText)
-            throw new Error(`Token exchange failed with ${tokenResponse.status}: ${errorText}`)
-          }
-
-          const tokenData = await tokenResponse.json()
-          console.log('Token exchange successful for user:', state)
-          
-          // Store platform access
-          const { error: storeError } = await supabaseClient
-            .from('user_platform_access')
-            .upsert({
-              user_id: state,
-              platform_name: 'survey_generator',
-              access_token: tokenData.access_token,
-              expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
-              is_active: true
-            })
-
-          if (storeError) {
-            console.error('Error storing platform access:', storeError)
-            throw new Error('Failed to store platform access')
-          }
-
-          return new Response(
-            JSON.stringify({ success: true, access_token: tokenData.access_token }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-
-        } catch (error) {
-          console.error('Error exchanging code for token:', error)
-          return new Response(
-            JSON.stringify({ error: 'Failed to exchange authorization code' }),
+            JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to fetch surveys' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }

@@ -14,41 +14,16 @@ export const CrossPlatformAuthHandler = () => {
     const handleCrossPlatformAuth = async () => {
       const token = searchParams.get('token')
       const platform = searchParams.get('platform')
-      const code = searchParams.get('code')
-      const state = searchParams.get('state')
       
-      // Handle Survey Generator OAuth callback
-      if (code && state) {
-        try {
-          const { data: exchangeData, error: exchangeError } = await supabase.functions.invoke('survey-generator-api', {
-            body: {
-              action: 'exchange_code',
-              code,
-              state,
-              callback_url: `${window.location.origin}/auth`
-            }
-          })
-
-          if (exchangeError || !exchangeData.success) {
-            throw new Error('Failed to exchange authorization code')
-          }
-
-          toast.success('Successfully connected to Survey Generator!')
-          navigate('/', { replace: true })
-          return
-
-        } catch (error) {
-          console.error('OAuth callback error:', error)
-          toast.error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-          navigate('/', { replace: true })
-          return
-        }
+      // Handle incoming authentication token from external platforms
+      if (!token || !platform) {
+        console.log('No token or platform in URL parameters')
+        return
       }
 
-      // Handle existing cross-platform auth flow
-      if (!token || !platform) return
-
       try {
+        console.log('Processing cross-platform auth:', { platform, tokenPresent: !!token })
+
         // Validate token with cross-platform auth function
         const { data: validationData, error: validationError } = await supabase.functions.invoke('cross-platform-auth', {
           body: {
@@ -59,11 +34,15 @@ export const CrossPlatformAuthHandler = () => {
         })
 
         if (validationError || !validationData.valid) {
+          console.error('Token validation failed:', validationError)
           throw new Error('Invalid authentication token')
         }
 
+        console.log('Token validation successful:', validationData)
+
         // If user is already logged in, sync permissions
         if (user) {
+          console.log('User already logged in, syncing permissions')
           await supabase.functions.invoke('cross-platform-auth', {
             body: {
               action: 'sync_permissions',
@@ -82,6 +61,7 @@ export const CrossPlatformAuthHandler = () => {
         }
 
         // Create session for new user
+        console.log('Creating new user session')
         const { data: sessionData, error: sessionError } = await supabase.functions.invoke('cross-platform-auth', {
           body: {
             action: 'create_session',
@@ -94,10 +74,14 @@ export const CrossPlatformAuthHandler = () => {
           }
         })
 
-        if (sessionError) throw sessionError
+        if (sessionError) {
+          console.error('Session creation failed:', sessionError)
+          throw sessionError
+        }
 
         // Redirect to session URL for automatic login
         if (sessionData.session_url) {
+          console.log('Redirecting to session URL')
           window.location.href = sessionData.session_url
         } else {
           toast.success(`Welcome from ${platform}!`)
@@ -114,5 +98,12 @@ export const CrossPlatformAuthHandler = () => {
     handleCrossPlatformAuth()
   }, [searchParams, navigate, user])
 
-  return null
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-muted-foreground">Processing authentication...</p>
+      </div>
+    </div>
+  )
 }

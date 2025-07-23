@@ -34,7 +34,7 @@ export const useSurveyGenerator = () => {
     if (!user) return
 
     try {
-      // First check if user has Survey Generator access according to their tier
+      // Check if user has Survey Generator access according to their tier
       const { data: tierAccess, error: tierError } = await supabase.rpc('has_platform_access', {
         user_id: user.id,
         platform: 'survey_generator'
@@ -49,14 +49,13 @@ export const useSurveyGenerator = () => {
       setHasAccess(tierAccess)
       
       if (tierAccess) {
-        // Check if user has authenticated with Survey Generator
-        const { data: authData, error: authError } = await supabase
-          .from('user_platform_access')
-          .select('access_token, expires_at')
-          .eq('user_id', user.id)
-          .eq('platform_name', 'survey_generator')
-          .eq('is_active', true)
-          .maybeSingle()
+        // Check authentication status with the Survey Generator API
+        const { data: authData, error: authError } = await supabase.functions.invoke('survey-generator-api', {
+          body: {
+            action: 'check_authentication',
+            user_id: user.id
+          }
+        })
 
         if (authError) {
           console.error('Error checking authentication:', authError)
@@ -64,7 +63,7 @@ export const useSurveyGenerator = () => {
           return
         }
 
-        setIsAuthenticated(!!authData?.access_token)
+        setIsAuthenticated(authData.authenticated)
       }
     } catch (error) {
       console.error('Error checking Survey Generator access:', error)
@@ -81,29 +80,11 @@ export const useSurveyGenerator = () => {
 
     setLoading(true)
     try {
-      // Get platform access token
-      const { data: platformAccess, error: accessError } = await supabase
-        .from('user_platform_access')
-        .select('access_token, expires_at')
-        .eq('user_id', user.id)
-        .eq('platform_name', 'survey_generator')
-        .eq('is_active', true)
-        .maybeSingle()
-
-      if (accessError || !platformAccess) {
-        throw new Error('No valid Survey Generator access token found. Please authenticate first.')
-      }
-
-      // Check if token is expired
-      if (platformAccess.expires_at && new Date(platformAccess.expires_at) < new Date()) {
-        throw new Error('Survey Generator access token has expired. Please authenticate again.')
-      }
-
-      // Call the Survey Generator API through our edge function
+      // Fetch surveys using the Survey Generator API
       const { data: surveysData, error: surveysError } = await supabase.functions.invoke('survey-generator-api', {
         body: {
           action: 'fetch_surveys',
-          access_token: platformAccess.access_token
+          user_id: user.id
         }
       })
 
@@ -163,34 +144,18 @@ export const useSurveyGenerator = () => {
     }
   }
 
-  const authenticateWithSurveyGenerator = async () => {
+  const refreshAuthentication = async () => {
     if (!user) return
 
     setLoading(true)
     try {
-      // Generate auth URL with the Survey Generator platform
-      const { data: authData, error: authError } = await supabase.functions.invoke('survey-generator-api', {
-        body: {
-          action: 'generate_auth_url',
-          user_id: user.id,
-          callback_url: `${window.location.origin}/auth`
-        }
-      })
-
-      if (authError) {
-        console.error('Auth error:', authError)
-        throw new Error('Failed to generate authentication URL')
-      }
-
-      // Redirect to Survey Generator OAuth flow
-      if (authData.auth_url) {
-        window.location.href = authData.auth_url
-      } else {
-        throw new Error('No authentication URL received')
+      await checkAccess()
+      if (isAuthenticated) {
+        toast.success('Authentication status refreshed')
       }
     } catch (error) {
-      console.error('Error authenticating with Survey Generator:', error)
-      toast.error('Failed to authenticate with Survey Generator')
+      console.error('Error refreshing authentication:', error)
+      toast.error('Failed to refresh authentication status')
     } finally {
       setLoading(false)
     }
@@ -203,6 +168,6 @@ export const useSurveyGenerator = () => {
     isAuthenticated,
     fetchSurveys,
     importSurvey,
-    authenticateWithSurveyGenerator
+    refreshAuthentication
   }
 }

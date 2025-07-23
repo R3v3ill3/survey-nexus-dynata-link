@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ExternalLink, Import, Shield, Clock, Users, AlertCircle } from 'lucide-react'
+import { ExternalLink, Import, Shield, Clock, Users, AlertCircle, RefreshCw } from 'lucide-react'
 import { useSurveyGenerator } from '@/hooks/useSurveyGenerator'
 import { TierUpgradePrompt } from '@/components/TierUpgradePrompt'
 import { useMembershipTier } from '@/hooks/useMembershipTier'
@@ -18,7 +18,7 @@ interface SurveyGeneratorDialogProps {
 
 export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGeneratorDialogProps) {
   const [open, setOpen] = useState(false)
-  const { surveys, loading, hasAccess, isAuthenticated, fetchSurveys, importSurvey, authenticateWithSurveyGenerator } = useSurveyGenerator()
+  const { surveys, loading, hasAccess, isAuthenticated, fetchSurveys, importSurvey, refreshAuthentication } = useSurveyGenerator()
   const { tierInfo, allTiers } = useMembershipTier()
 
   useEffect(() => {
@@ -98,20 +98,47 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
                 Authentication Required
               </CardTitle>
               <CardDescription>
-                Connect your Survey Generator account to import surveys
+                The Survey Generator platform needs to authenticate with your account
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
-                <p className="text-sm text-blue-800">
-                  You need to authenticate with Survey Generator to access your surveys
-                </p>
+                <div className="text-sm text-blue-800">
+                  <p className="font-medium mb-1">Integration Setup Required</p>
+                  <p>The Survey Generator platform (poll-assistant.reveille.net.au) needs to authenticate with your account using these details:</p>
+                </div>
               </div>
-              <Button onClick={authenticateWithSurveyGenerator} className="w-full" disabled={loading}>
-                <Shield className="h-4 w-4 mr-2" />
-                {loading ? 'Connecting...' : 'Connect Survey Generator'}
-              </Button>
+              
+              <div className="bg-muted p-4 rounded-lg space-y-2">
+                <div className="text-sm">
+                  <p className="font-medium">Sync Endpoint:</p>
+                  <code className="text-xs bg-background p-1 rounded">
+                    https://dmyajxekgerixzojzlej.supabase.co/functions/v1/sync-to-survey-generator
+                  </code>
+                </div>
+                <div className="text-sm">
+                  <p className="font-medium">Auth Endpoint:</p>
+                  <code className="text-xs bg-background p-1 rounded">
+                    https://dmyajxekgerixzojzlej.supabase.co/functions/v1/cross-platform-auth
+                  </code>
+                </div>
+                <div className="text-sm">
+                  <p className="font-medium">Platform ID:</p>
+                  <code className="text-xs bg-background p-1 rounded">pop-poll.reveille.net.au</code>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  onClick={refreshAuthentication} 
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {loading ? 'Checking...' : 'Check Authentication'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : (

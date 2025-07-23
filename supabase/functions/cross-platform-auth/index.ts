@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -119,13 +118,13 @@ serve(async (req) => {
               { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
           }
+        } else {
+          // Only return "Unsupported platform" if platform is not survey_generator
+          return new Response(
+            JSON.stringify({ error: 'Unsupported platform' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
-        
-        // Only return "Unsupported platform" if platform is not survey_generator
-        return new Response(
-          JSON.stringify({ error: 'Unsupported platform' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
 
       case 'validate_token':
         // Validate JWT token from Survey Generator

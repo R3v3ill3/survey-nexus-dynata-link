@@ -23,9 +23,9 @@ serve(async (req) => {
       }
     )
 
-    const { action, user_id } = await req.json()
+    const { action, user_id, project_id } = await req.json()
     
-    console.log('Survey Generator API request:', { action, user_id })
+    console.log('Survey Generator API request:', { action, user_id, project_id })
 
     switch (action) {
       case 'check_authentication':
@@ -69,6 +69,53 @@ serve(async (req) => {
           console.error('Error checking authentication:', error)
           return new Response(
             JSON.stringify({ error: 'Failed to check authentication' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+      case 'create_survey':
+        if (!user_id) {
+          return new Response(
+            JSON.stringify({ error: 'User ID required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        try {
+          // Get platform access token
+          const { data: platformAccess, error: accessError } = await supabaseClient
+            .from('user_platform_access')
+            .select('access_token, expires_at')
+            .eq('user_id', user_id)
+            .eq('platform_name', 'survey_generator')
+            .eq('is_active', true)
+            .maybeSingle()
+
+          if (accessError || !platformAccess) {
+            throw new Error('No valid Survey Generator access token found. Please authenticate first.')
+          }
+
+          // Check if token is expired
+          if (platformAccess.expires_at && new Date(platformAccess.expires_at) < new Date()) {
+            throw new Error('Survey Generator access token has expired. Please authenticate again.')
+          }
+
+          // Return the survey creation URL
+          const surveyGeneratorUrl = Deno.env.get('SURVEY_GENERATOR_URL') || 'https://poll-assistant.reveille.net.au'
+          const createUrl = `${surveyGeneratorUrl}/create-survey?user_id=${user_id}&project_id=${project_id || ''}`
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true,
+              survey_url: createUrl
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+
+        } catch (error) {
+          console.error('Error creating survey:', error)
+          return new Response(
+            JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to create survey' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }

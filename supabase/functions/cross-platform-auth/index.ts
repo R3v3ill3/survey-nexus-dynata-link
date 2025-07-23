@@ -18,11 +18,65 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
-    const { action, token, platform, user_data } = await req.json()
+    const { action, token, platform, user_data, user_id, project_id } = await req.json()
     
-    console.log('Cross-platform auth request:', { action, platform })
+    console.log('Cross-platform auth request:', { action, platform, user_id })
 
     switch (action) {
+      case 'initiate_auth':
+        // Handle authentication initiation for Survey Generator
+        if (platform === 'survey_generator') {
+          try {
+            // Generate a session token for the user
+            const authToken = btoa(JSON.stringify({
+              user_id,
+              project_id,
+              platform: 'survey_generator',
+              timestamp: Date.now(),
+              expires_at: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+            }))
+
+            // Store the pending authentication
+            const { error: insertError } = await supabaseClient
+              .from('user_platform_access')
+              .upsert({
+                user_id,
+                platform_name: 'survey_generator',
+                access_token: authToken,
+                is_active: true,
+                expires_at: new Date(Date.now() + (24 * 60 * 60 * 1000)).toISOString(),
+                last_accessed: new Date().toISOString()
+              }, {
+                onConflict: 'user_id,platform_name'
+              })
+
+            if (insertError) {
+              console.error('Error storing platform access:', insertError)
+              throw new Error('Failed to store authentication')
+            }
+
+            // Return success with the redirect URL
+            const redirectUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cross-platform-auth`
+            const surveyGeneratorUrl = Deno.env.get('SURVEY_GENERATOR_URL') || 'https://poll-assistant.reveille.net.au'
+            
+            return new Response(
+              JSON.stringify({ 
+                success: true,
+                auth_url: `${surveyGeneratorUrl}?token=${authToken}&redirect_url=${encodeURIComponent(redirectUrl)}&project_id=${project_id}`
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+
+          } catch (error) {
+            console.error('Error initiating auth:', error)
+            return new Response(
+              JSON.stringify({ error: 'Failed to initiate authentication' }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+        }
+        break
+
       case 'validate_token':
         // Validate JWT token from Survey Generator
         try {

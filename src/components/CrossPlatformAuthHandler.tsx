@@ -14,14 +14,14 @@ export const CrossPlatformAuthHandler = () => {
   useEffect(() => {
     const handleCrossPlatformAuth = async () => {
       const token = searchParams.get('token')
-      const platform = searchParams.get('platform')
+      const platform = searchParams.get('platform') || 'survey_generator'
       const projectId = searchParams.get('project_id')
       
       console.log('Cross-platform auth params:', { token: !!token, platform, projectId })
 
-      // Only process if we have both token and platform parameters
-      if (!token || !platform) {
-        console.log('Missing token or platform, skipping auth processing')
+      // Only process if we have a token parameter
+      if (!token) {
+        console.log('No token provided, skipping auth processing')
         return
       }
 
@@ -37,42 +37,37 @@ export const CrossPlatformAuthHandler = () => {
       try {
         console.log('Processing cross-platform auth:', { platform, tokenPresent: !!token })
 
-        // Validate token with cross-platform auth function
-        const { data: validationData, error: validationError } = await supabase.functions.invoke('cross-platform-auth', {
-          body: {
-            action: 'validate_token',
-            token,
-            platform
-          }
-        })
+        // For Survey Generator, we already have the token stored during initiation
+        // We just need to verify it's still valid and update the authentication status
+        const { data: platformAccess, error: accessError } = await supabase
+          .from('user_platform_access')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('platform_name', platform)
+          .eq('access_token', token)
+          .maybeSingle()
 
-        if (validationError || !validationData.valid) {
-          console.error('Token validation failed:', validationError)
+        if (accessError || !platformAccess) {
+          console.error('Platform access validation failed:', accessError)
           throw new Error('Invalid authentication token')
         }
 
-        console.log('Token validation successful:', validationData)
-
-        // Store platform access in user_platform_access table
-        const { error: accessError } = await supabase
+        // Update last accessed time
+        const { error: updateError } = await supabase
           .from('user_platform_access')
-          .upsert({
-            user_id: user.id,
-            platform_name: platform,
-            access_token: token,
-            is_active: true,
-            expires_at: validationData.expires_at || null,
-            last_accessed: new Date().toISOString()
-          }, {
-            onConflict: 'user_id,platform_name'
+          .update({
+            last_accessed: new Date().toISOString(),
+            is_active: true
           })
+          .eq('user_id', user.id)
+          .eq('platform_name', platform)
 
-        if (accessError) {
-          console.error('Error storing platform access:', accessError)
-          throw new Error('Failed to store authentication')
+        if (updateError) {
+          console.error('Error updating platform access:', updateError)
+          throw new Error('Failed to update authentication status')
         }
 
-        console.log('Platform access stored successfully')
+        console.log('Platform access updated successfully')
         toast.success(`Successfully connected to ${platform}`)
         
         // Redirect back to the project page

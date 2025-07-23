@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
@@ -92,24 +91,43 @@ export const useSurveyGenerator = () => {
     }
   }
 
-  const initiateAuthentication = () => {
+  const initiateAuthentication = async () => {
     if (!user) return
 
-    // Generate authentication URL for Survey Generator
-    const surveyGeneratorUrl = 'https://poll-assistant.reveille.net.au'
-    const redirectUrl = `${window.location.origin}/auth/cross-platform`
-    const authUrl = `${surveyGeneratorUrl}/auth/cross-platform?` +
-      `redirect_url=${encodeURIComponent(redirectUrl)}&` +
-      `platform_id=pop-poll.reveille.net.au&` +
-      `user_id=${user.id}&` +
-      `project_id=${projectId || ''}&` +
-      `email=${encodeURIComponent(user.email || '')}`
+    setLoading(true)
+    try {
+      console.log('Initiating authentication via Supabase function')
+      
+      // Use the cross-platform-auth function to initiate authentication
+      const { data, error } = await supabase.functions.invoke('cross-platform-auth', {
+        body: {
+          action: 'initiate_auth',
+          platform: 'survey_generator',
+          user_id: user.id,
+          project_id: projectId || ''
+        }
+      })
 
-    console.log('Initiating authentication with URL:', authUrl)
-    
-    // Open Survey Generator for authentication
-    window.open(authUrl, '_blank')
-    toast.info('Please complete authentication in the Survey Generator window')
+      if (error) {
+        console.error('Authentication initiation error:', error)
+        throw new Error('Failed to initiate authentication')
+      }
+
+      console.log('Authentication initiated successfully:', data)
+      
+      // Open the authentication URL
+      if (data.auth_url) {
+        window.open(data.auth_url, '_blank')
+        toast.info('Please complete authentication in the Survey Generator window')
+      } else {
+        throw new Error('No authentication URL received')
+      }
+    } catch (error) {
+      console.error('Error initiating authentication:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to initiate authentication')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const fetchSurveys = async () => {
@@ -142,14 +160,37 @@ export const useSurveyGenerator = () => {
     }
   }
 
-  const createSurvey = () => {
+  const createSurvey = async () => {
     if (!user) return
 
-    const surveyGeneratorUrl = 'https://poll-assistant.reveille.net.au'
-    const createUrl = `${surveyGeneratorUrl}/create-survey?user_id=${user.id}&project_id=${projectId || ''}`
-    
-    window.open(createUrl, '_blank')
-    toast.info('Opening Survey Generator to create a new survey. After creating, return here to refresh and import it.')
+    setLoading(true)
+    try {
+      // Use Supabase function to create survey
+      const { data, error } = await supabase.functions.invoke('survey-generator-api', {
+        body: {
+          action: 'create_survey',
+          user_id: user.id,
+          project_id: projectId || ''
+        }
+      })
+
+      if (error) {
+        console.error('Create survey error:', error)
+        throw new Error('Failed to create survey')
+      }
+
+      if (data.survey_url) {
+        window.open(data.survey_url, '_blank')
+        toast.info('Opening Survey Generator to create a new survey. After creating, return here to refresh and import it.')
+      } else {
+        toast.info('Survey creation initiated. Please check Survey Generator.')
+      }
+    } catch (error) {
+      console.error('Error creating survey:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to create survey')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const importSurvey = async (surveyId: string, projectId: string) => {

@@ -1,22 +1,24 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ArrowLeft, 
   FileText, 
   Target, 
-  Download, 
   Settings, 
   Activity,
-  Plus,
-  Calendar
+  Calendar,
+  BarChart3
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { SurveyManagement } from "@/components/SurveyManagement";
+import QuotaManagement from "@/components/QuotaManagement";
 
 interface Project {
   id: string;
@@ -53,6 +55,7 @@ const ProjectDetail = () => {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     if (!user) {
@@ -251,106 +254,123 @@ const ProjectDetail = () => {
           </Card>
         </div>
 
-        {/* Main Actions */}
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Survey Management */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Survey Management
-              </CardTitle>
-              <CardDescription>
-                Import and manage surveys for this project
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button className="w-full gap-2">
-                <Download className="h-4 w-4" />
-                Import Survey
-              </Button>
-              
-              {surveys.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Current Surveys</h4>
-                    {surveys.map((survey) => (
-                      <div 
-                        key={survey.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <div className="font-medium">{survey.title}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {survey.external_platform}
-                          </div>
-                        </div>
-                        <Badge variant="outline" className={getStatusColor(survey.status)}>
-                          {survey.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+        {/* Main Content Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="surveys" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Surveys
+            </TabsTrigger>
+            <TabsTrigger value="quotas" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Quotas
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Quota Management */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Quota Management
-              </CardTitle>
-              <CardDescription>
-                Import and configure quota requirements
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button className="w-full gap-2">
-                <Download className="h-4 w-4" />
-                Import Quotas
-              </Button>
-              
-              <Button variant="outline" className="w-full gap-2">
-                <Plus className="h-4 w-4" />
-                Create Line Item
-              </Button>
-              
-              {lineItems.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Line Items</h4>
-                    {lineItems.slice(0, 3).map((item) => (
-                      <div 
-                        key={item.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <div className="font-medium">{item.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {item.completed} / {item.quota} completed
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Survey Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Survey Summary
+                  </CardTitle>
+                  <CardDescription>
+                    Quick overview of imported surveys
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {surveys.length > 0 ? (
+                    <div className="space-y-2">
+                      {surveys.slice(0, 3).map((survey) => (
+                        <div 
+                          key={survey.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
+                          <div>
+                            <div className="font-medium">{survey.title}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {survey.external_platform}
+                            </div>
                           </div>
+                          <Badge variant="outline" className={getStatusColor(survey.status)}>
+                            {survey.status}
+                          </Badge>
                         </div>
-                        <Badge variant="outline">
-                          {item.channel_type}
-                        </Badge>
-                      </div>
-                    ))}
-                    {lineItems.length > 3 && (
-                      <p className="text-sm text-muted-foreground text-center">
-                        +{lineItems.length - 3} more line items
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                      ))}
+                      {surveys.length > 3 && (
+                        <p className="text-sm text-muted-foreground text-center pt-2">
+                          +{surveys.length - 3} more surveys
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-center py-4">
+                      No surveys imported yet
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Quota Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="h-5 w-5" />
+                    Quota Summary
+                  </CardTitle>
+                  <CardDescription>
+                    Line items and quota progress
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {lineItems.length > 0 ? (
+                    <div className="space-y-2">
+                      {lineItems.slice(0, 3).map((item) => (
+                        <div 
+                          key={item.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
+                          <div>
+                            <div className="font-medium">{item.name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {item.completed} / {item.quota} completed
+                            </div>
+                          </div>
+                          <Badge variant="outline">
+                            {item.channel_type}
+                          </Badge>
+                        </div>
+                      ))}
+                      {lineItems.length > 3 && (
+                        <p className="text-sm text-muted-foreground text-center pt-2">
+                          +{lineItems.length - 3} more line items
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-center py-4">
+                      No line items created yet
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="surveys" className="space-y-6">
+            <SurveyManagement project={project} />
+          </TabsContent>
+
+          <TabsContent value="quotas" className="space-y-6">
+            <QuotaManagement activeProject={project} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

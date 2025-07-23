@@ -71,10 +71,10 @@ serve(async (req) => {
               throw new Error('Failed to store authentication')
             }
 
-            // Return success with the enhanced redirect URL
+            // Return success with the enhanced redirect URL - FIXED: Normalize URL to prevent double slashes
             const mainPlatformUrl = Deno.env.get('MAIN_PLATFORM_URL') || 'https://dmyajxekgerixzojzlej.supabase.co'
             const callbackUrl = `${mainPlatformUrl}/auth/cross-platform-callback`
-            const surveyGeneratorUrl = Deno.env.get('SURVEY_GENERATOR_URL') || 'https://poll-assistant.reveille.net.au'
+            const surveyGeneratorUrl = (Deno.env.get('SURVEY_GENERATOR_URL') || 'https://poll-assistant.reveille.net.au').replace(/\/$/, '')
             
             const authUrl = `${surveyGeneratorUrl}/auth/cross-platform-callback?` +
               `token=${authToken}&` +

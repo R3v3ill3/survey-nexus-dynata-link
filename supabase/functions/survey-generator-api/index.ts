@@ -100,9 +100,9 @@ serve(async (req) => {
             throw new Error('Survey Generator access token has expired. Please authenticate again.')
           }
 
-          // Return the survey creation URL
+          // Return the survey creation URL - FIXED: Changed from /create-survey to /dashboard
           const surveyGeneratorUrl = Deno.env.get('SURVEY_GENERATOR_URL') || 'https://poll-assistant.reveille.net.au'
-          const createUrl = `${surveyGeneratorUrl}/create-survey?user_id=${user_id}&project_id=${project_id || ''}`
+          const createUrl = `${surveyGeneratorUrl}/dashboard?user_id=${user_id}&project_id=${project_id || ''}`
           
           return new Response(
             JSON.stringify({ 

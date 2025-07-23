@@ -97,9 +97,9 @@ export const useSurveyGenerator = () => {
 
     setLoading(true)
     try {
-      console.log('Initiating authentication via Supabase function')
+      console.log('Initiating cross-platform authentication')
       
-      // Use the cross-platform-auth function to initiate authentication
+      // Use the updated cross-platform-auth function for direct authentication
       const { data, error } = await supabase.functions.invoke('cross-platform-auth', {
         body: {
           action: 'initiate_auth',
@@ -110,27 +110,25 @@ export const useSurveyGenerator = () => {
       })
 
       if (error) {
-        console.error('Authentication initiation error:', error)
-        throw new Error('Failed to initiate authentication')
+        console.error('Authentication error:', error)
+        throw new Error('Failed to authenticate with Survey Generator')
       }
 
-      console.log('Authentication initiated successfully:', data)
+      console.log('Authentication successful:', data)
       
-      // Use regular redirect instead of popup to avoid popup blockers
-      if (data.auth_url) {
-        // Store the current location so we can return here after auth
-        sessionStorage.setItem('survey_generator_return_url', window.location.href)
+      if (data.success) {
+        // Authentication was successful, update our state
+        setIsAuthenticated(true)
+        toast.success('Successfully connected to Survey Generator!')
         
-        // Redirect to the Survey Generator authentication page
-        window.location.href = data.auth_url
-        
-        toast.info('Redirecting to Survey Generator for authentication...')
+        // Refresh the surveys
+        await fetchSurveys()
       } else {
-        throw new Error('No authentication URL received')
+        throw new Error(data.error || 'Authentication failed')
       }
     } catch (error) {
-      console.error('Error initiating authentication:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to initiate authentication')
+      console.error('Error during authentication:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to authenticate with Survey Generator')
     } finally {
       setLoading(false)
     }
@@ -144,7 +142,7 @@ export const useSurveyGenerator = () => {
 
     setLoading(true)
     try {
-      // Fetch surveys using the Survey Generator API
+      // Fetch surveys using the updated Survey Generator API
       const { data: surveysData, error: surveysError } = await supabase.functions.invoke('survey-generator-api', {
         body: {
           action: 'fetch_surveys',
@@ -157,6 +155,7 @@ export const useSurveyGenerator = () => {
         throw new Error('Failed to fetch surveys from Survey Generator')
       }
 
+      console.log('Fetched surveys:', surveysData)
       setSurveys(surveysData.surveys || [])
     } catch (error) {
       console.error('Error fetching Survey Generator surveys:', error)

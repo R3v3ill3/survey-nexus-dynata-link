@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -17,9 +18,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
-    const { action, token, platform, user_data, user_id, project_id, status } = await req.json()
+    const { action, token, platform, user_data, user_id, project_id, status, platform_id, sync_token } = await req.json()
     
-    console.log('Cross-platform auth request:', { action, platform, user_id })
+    console.log('Cross-platform auth request:', { action, platform, user_id, platform_id })
 
     switch (action) {
       case 'initiate_auth':
@@ -38,29 +39,58 @@ serve(async (req) => {
               throw new Error('Failed to fetch user data')
             }
 
-            // Generate a secure token with user data
-            const authToken = btoa(JSON.stringify({
-              user_id,
-              project_id,
-              platform: 'survey_generator',
-              timestamp: Date.now(),
-              expires_at: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
+            // Call Survey Generator's authentication endpoint with proper parameters
+            const surveyGeneratorSyncToken = Deno.env.get('SURVEY_GENERATOR_SYNC_TOKEN')
+            if (!surveyGeneratorSyncToken) {
+              throw new Error('Survey Generator sync token not configured')
+            }
+
+            const authPayload = {
+              platform_id: 'pop-poll.reveille.net.au',
+              sync_token: surveyGeneratorSyncToken,
               user_data: {
+                user_id: user_id,
                 email: profile.email,
                 full_name: profile.full_name,
-                membership_tier: profile.membership_tier
+                membership_tier: profile.membership_tier,
+                project_id: project_id || ''
               }
-            }))
+            }
 
-            // Store the pending authentication
+            console.log('Calling Survey Generator auth endpoint with:', authPayload)
+
+            // Call Survey Generator's cross-platform auth endpoint
+            const surveyGeneratorAuthUrl = 'https://wxbmorjrasmvzielzznn.supabase.co/functions/v1/cross-platform-auth'
+            const authResponse = await fetch(surveyGeneratorAuthUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(authPayload)
+            })
+
+            if (!authResponse.ok) {
+              const errorText = await authResponse.text()
+              console.error('Survey Generator auth error:', authResponse.status, errorText)
+              throw new Error(`Survey Generator authentication failed: ${authResponse.status}`)
+            }
+
+            const authData = await authResponse.json()
+            console.log('Survey Generator auth response:', authData)
+
+            if (!authData.access_token) {
+              throw new Error('No access token received from Survey Generator')
+            }
+
+            // Store the access token in our database
             const { error: insertError } = await supabaseClient
               .from('user_platform_access')
               .upsert({
                 user_id,
                 platform_name: 'survey_generator',
-                access_token: authToken,
+                access_token: authData.access_token,
                 is_active: true,
-                expires_at: new Date(Date.now() + (24 * 60 * 60 * 1000)).toISOString(),
+                expires_at: authData.expires_at ? new Date(authData.expires_at).toISOString() : null,
                 last_accessed: new Date().toISOString()
               }, {
                 onConflict: 'user_id,platform_name'
@@ -71,24 +101,12 @@ serve(async (req) => {
               throw new Error('Failed to store authentication')
             }
 
-            // Return success with the enhanced redirect URL - FIXED: Normalize URL to prevent double slashes
-            const mainPlatformUrl = Deno.env.get('MAIN_PLATFORM_URL') || 'https://dmyajxekgerixzojzlej.supabase.co'
-            const callbackUrl = `${mainPlatformUrl}/auth/cross-platform-callback`
-            const surveyGeneratorUrl = (Deno.env.get('SURVEY_GENERATOR_URL') || 'https://poll-assistant.reveille.net.au').replace(/\/$/, '')
-            
-            const authUrl = `${surveyGeneratorUrl}/auth/cross-platform-callback?` +
-              `token=${authToken}&` +
-              `platform=pop-poll&` +
-              `callback_url=${encodeURIComponent(callbackUrl)}&` +
-              `project_id=${project_id}&` +
-              `user_email=${encodeURIComponent(profile.email)}&` +
-              `user_name=${encodeURIComponent(profile.full_name || '')}&` +
-              `tier=${profile.membership_tier}`
-            
+            // Return success - no redirect needed, just token stored
             return new Response(
               JSON.stringify({ 
                 success: true,
-                auth_url: authUrl
+                message: 'Authentication successful',
+                access_token: authData.access_token
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
@@ -96,7 +114,7 @@ serve(async (req) => {
           } catch (error) {
             console.error('Error initiating auth:', error)
             return new Response(
-              JSON.stringify({ error: 'Failed to initiate authentication' }),
+              JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to initiate authentication' }),
               { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
           }

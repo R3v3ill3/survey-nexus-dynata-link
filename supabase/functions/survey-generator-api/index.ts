@@ -100,7 +100,7 @@ serve(async (req) => {
             throw new Error('Survey Generator access token has expired. Please authenticate again.')
           }
 
-          // FIXED: Use Survey Generator's Supabase Edge Function URL instead of direct API call
+          // Use Survey Generator's create survey endpoint
           const surveyGeneratorUrl = Deno.env.get('SURVEY_GENERATOR_URL') || 'https://poll-assistant.reveille.net.au'
           const createUrl = `${surveyGeneratorUrl}/dashboard?user_id=${user_id}&project_id=${project_id || ''}`
           
@@ -147,10 +147,10 @@ serve(async (req) => {
             throw new Error('Survey Generator access token has expired. Please authenticate again.')
           }
 
-          // FIXED: Call Survey Generator's Supabase Edge Function instead of direct API call
+          // Call Survey Generator's Edge Function with the cross-platform token
           const surveyGeneratorApiUrl = 'https://wxbmorjrasmvzielzznn.supabase.co/functions/v1/survey-api/surveys'
           
-          console.log('Fetching surveys from Survey Generator Edge Function:', surveyGeneratorApiUrl)
+          console.log('Fetching surveys from Survey Generator with cross-platform token')
           
           const response = await fetch(surveyGeneratorApiUrl, {
             method: 'GET',
@@ -162,11 +162,12 @@ serve(async (req) => {
 
           if (!response.ok) {
             const responseText = await response.text()
-            console.error('Survey Generator Edge Function error:', response.status, responseText)
-            throw new Error(`Survey Generator Edge Function returned ${response.status}: ${response.statusText}`)
+            console.error('Survey Generator API error:', response.status, responseText)
+            throw new Error(`Survey Generator API returned ${response.status}: ${response.statusText}`)
           }
 
           const surveysData = await response.json()
+          console.log('Received surveys data:', surveysData)
           
           return new Response(
             JSON.stringify({ surveys: surveysData.surveys || [] }),
@@ -174,7 +175,7 @@ serve(async (req) => {
           )
 
         } catch (error) {
-          console.error('Error fetching surveys from Survey Generator Edge Function:', error)
+          console.error('Error fetching surveys from Survey Generator:', error)
           return new Response(
             JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to fetch surveys' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

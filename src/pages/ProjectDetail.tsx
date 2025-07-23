@@ -19,15 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { SurveyManagement } from "@/components/SurveyManagement";
 import QuotaManagement from "@/components/QuotaManagement";
-
-interface Project {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
+import { Project } from "@/types/database";
 
 interface Survey {
   id: string;
@@ -80,7 +72,10 @@ const ProjectDetail = () => {
         .single();
 
       if (projectError) throw projectError;
-      setProject(projectData);
+      setProject({
+        ...projectData,
+        settings: projectData.settings as Record<string, any>
+      });
 
       // Fetch surveys
       const { data: surveyData, error: surveyError } = await supabase

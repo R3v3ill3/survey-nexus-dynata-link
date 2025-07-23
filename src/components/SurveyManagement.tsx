@@ -9,20 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ExternalLink, Clock, Users, Target, Settings, Play, Pause, Square } from "lucide-react"
 import { toast } from "sonner"
 import { ImportSurveyDialog } from "./survey/ImportSurveyDialog"
-import type { Project } from "@/types/database"
+import type { Project, Survey } from "@/types/database"
 
-interface Survey {
-  id: string
-  external_survey_id: string
-  title: string
-  description?: string
-  estimated_length?: number
-  survey_url: string
-  status: string
-  target_audience: Record<string, any>
-  quota_requirements: Record<string, any>
-  external_platform: string
-  created_at: string
+interface SurveyWithLineItems extends Survey {
   survey_line_items?: Array<{
     id: string
     line_item_id: string
@@ -37,7 +26,7 @@ interface SurveyManagementProps {
 
 export function SurveyManagement({ project }: SurveyManagementProps) {
   const { user } = useAuth()
-  const [surveys, setSurveys] = useState<Survey[]>([])
+  const [surveys, setSurveys] = useState<SurveyWithLineItems[]>([])
   const [loading, setLoading] = useState(false)
 
   const fetchSurveys = async () => {
@@ -45,15 +34,23 @@ export function SurveyManagement({ project }: SurveyManagementProps) {
 
     setLoading(true)
     try {
-      // Fetch surveys directly from the surveys table
+      // Fetch surveys with survey line items
       const { data, error } = await supabase
         .from('surveys')
-        .select('*')
+        .select(`
+          *,
+          survey_line_items (
+            id,
+            line_item_id,
+            survey_quota,
+            priority
+          )
+        `)
         .eq('project_id', project.id)
 
       if (error) throw error
 
-      setSurveys(data || [])
+      setSurveys((data as any) || [])
     } catch (error) {
       console.error('Error fetching surveys:', error)
       toast.error('Failed to load surveys')

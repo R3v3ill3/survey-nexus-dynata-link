@@ -24,12 +24,12 @@ const App = () => (
     <BrowserRouter>
       <AuthProvider>
         <TooltipProvider>
-          <CrossPlatformAuthHandler />
           <Toaster />
           <Sonner />
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/auth/cross-platform" element={<CrossPlatformAuthHandler />} />
             <Route path="/select-tier" element={
               <ProtectedRoute>
                 <TierSelection />

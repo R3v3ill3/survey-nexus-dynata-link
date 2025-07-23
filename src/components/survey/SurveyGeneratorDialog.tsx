@@ -49,10 +49,10 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-success'
-      case 'draft': return 'bg-warning'
-      case 'completed': return 'bg-muted'
-      default: return 'bg-muted'
+      case 'active': return 'bg-green-100 text-green-800'
+      case 'draft': return 'bg-yellow-100 text-yellow-800'
+      case 'completed': return 'bg-gray-100 text-gray-800'
+      default: return 'bg-gray-100 text-gray-800'
     }
   }
 
@@ -105,18 +105,18 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5" />
-                Authentication Required
+                Connect to Survey Generator
               </CardTitle>
               <CardDescription>
-                Connect to Survey Generator to import surveys
+                You need to authenticate with Survey Generator to import surveys
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
                 <div className="text-sm text-blue-800">
-                  <p className="font-medium mb-1">Connect to Survey Generator</p>
-                  <p>You need to authenticate with Survey Generator to import surveys into your project.</p>
+                  <p className="font-medium mb-1">Connect Your Account</p>
+                  <p>Click the button below to securely connect your Survey Generator account. This will open a new window for authentication.</p>
                 </div>
               </div>
 
@@ -135,7 +135,7 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
                   disabled={loading}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  {loading ? 'Checking...' : 'Check Status'}
+                  {loading ? 'Checking...' : 'Refresh Status'}
                 </Button>
               </div>
             </CardContent>

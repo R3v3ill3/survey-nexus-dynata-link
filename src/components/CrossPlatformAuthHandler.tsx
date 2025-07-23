@@ -15,9 +15,20 @@ export const CrossPlatformAuthHandler = () => {
     const handleCrossPlatformAuth = async () => {
       const token = searchParams.get('token')
       const platform = searchParams.get('platform')
+      const projectId = searchParams.get('project_id')
       
+      console.log('Cross-platform auth params:', { token: !!token, platform, projectId })
+
       // Only process if we have both token and platform parameters
       if (!token || !platform) {
+        console.log('Missing token or platform, skipping auth processing')
+        return
+      }
+
+      if (!user) {
+        console.log('No user logged in, cannot process cross-platform auth')
+        toast.error('Please log in to connect to Survey Generator')
+        navigate('/auth')
         return
       }
 
@@ -43,58 +54,35 @@ export const CrossPlatformAuthHandler = () => {
         console.log('Token validation successful:', validationData)
 
         // Store platform access in user_platform_access table
-        if (user) {
-          const { error: accessError } = await supabase
-            .from('user_platform_access')
-            .upsert({
-              user_id: user.id,
-              platform_name: platform,
-              access_token: token,
-              is_active: true,
-              expires_at: validationData.expires_at || null,
-              last_accessed: new Date().toISOString()
-            })
-
-          if (accessError) {
-            console.error('Error storing platform access:', accessError)
-            throw new Error('Failed to store authentication')
-          }
-
-          toast.success(`Successfully connected to ${platform}`)
-          navigate(`/project/${searchParams.get('project_id') || ''}`, { replace: true })
-        } else {
-          // If no user is logged in, create a new session
-          const { data: sessionData, error: sessionError } = await supabase.functions.invoke('cross-platform-auth', {
-            body: {
-              action: 'create_session',
-              user_data: {
-                id: validationData.user_id,
-                email: validationData.email,
-                full_name: validationData.full_name || validationData.email
-              },
-              platform
-            }
+        const { error: accessError } = await supabase
+          .from('user_platform_access')
+          .upsert({
+            user_id: user.id,
+            platform_name: platform,
+            access_token: token,
+            is_active: true,
+            expires_at: validationData.expires_at || null,
+            last_accessed: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,platform_name'
           })
 
-          if (sessionError) {
-            console.error('Session creation failed:', sessionError)
-            throw sessionError
-          }
-
-          // Redirect to session URL for automatic login
-          if (sessionData.session_url) {
-            console.log('Redirecting to session URL')
-            window.location.href = sessionData.session_url
-          } else {
-            toast.success(`Welcome from ${platform}!`)
-            navigate('/', { replace: true })
-          }
+        if (accessError) {
+          console.error('Error storing platform access:', accessError)
+          throw new Error('Failed to store authentication')
         }
+
+        console.log('Platform access stored successfully')
+        toast.success(`Successfully connected to ${platform}`)
+        
+        // Redirect back to the project page
+        const redirectPath = projectId ? `/project/${projectId}` : '/dashboard'
+        navigate(redirectPath, { replace: true })
 
       } catch (error) {
         console.error('Cross-platform auth error:', error)
         toast.error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-        navigate('/', { replace: true })
+        navigate('/dashboard', { replace: true })
       } finally {
         setIsProcessing(false)
       }

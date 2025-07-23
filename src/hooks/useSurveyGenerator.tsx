@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
+import { useParams } from 'react-router-dom'
 
 interface SurveyGeneratorSurvey {
   id: string
@@ -19,6 +20,7 @@ interface SurveyGeneratorSurvey {
 
 export const useSurveyGenerator = () => {
   const { user } = useAuth()
+  const { id: projectId } = useParams()
   const [loading, setLoading] = useState(false)
   const [surveys, setSurveys] = useState<SurveyGeneratorSurvey[]>([])
   const [hasAccess, setHasAccess] = useState(false)
@@ -69,9 +71,9 @@ export const useSurveyGenerator = () => {
         .eq('user_id', user.id)
         .eq('platform_name', 'survey_generator')
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
 
-      if (platformError && platformError.code !== 'PGRST116') {
+      if (platformError) {
         console.error('Error checking platform access:', platformError)
         setIsAuthenticated(false)
         return
@@ -100,10 +102,14 @@ export const useSurveyGenerator = () => {
       `redirect_url=${encodeURIComponent(redirectUrl)}&` +
       `platform_id=pop-poll.reveille.net.au&` +
       `user_id=${user.id}&` +
+      `project_id=${projectId || ''}&` +
       `email=${encodeURIComponent(user.email || '')}`
 
+    console.log('Initiating authentication with URL:', authUrl)
+    
     // Open Survey Generator for authentication
     window.open(authUrl, '_blank')
+    toast.info('Please complete authentication in the Survey Generator window')
   }
 
   const fetchSurveys = async () => {
@@ -140,10 +146,10 @@ export const useSurveyGenerator = () => {
     if (!user) return
 
     const surveyGeneratorUrl = 'https://poll-assistant.reveille.net.au'
-    const createUrl = `${surveyGeneratorUrl}/create-survey?user_id=${user.id}`
+    const createUrl = `${surveyGeneratorUrl}/create-survey?user_id=${user.id}&project_id=${projectId || ''}`
     
     window.open(createUrl, '_blank')
-    toast.info('Opening Survey Generator to create a new survey. After creating, return here to import it.')
+    toast.info('Opening Survey Generator to create a new survey. After creating, return here to refresh and import it.')
   }
 
   const importSurvey = async (surveyId: string, projectId: string) => {
@@ -196,6 +202,8 @@ export const useSurveyGenerator = () => {
       await checkAuthentication()
       if (isAuthenticated) {
         toast.success('Authentication status refreshed')
+      } else {
+        toast.info('Not authenticated - please connect to Survey Generator')
       }
     } catch (error) {
       console.error('Error refreshing authentication:', error)

@@ -42,52 +42,53 @@ export const CrossPlatformAuthHandler = () => {
 
         console.log('Token validation successful:', validationData)
 
-        // If user is already logged in, sync permissions
+        // Store platform access in user_platform_access table
         if (user) {
-          console.log('User already logged in, syncing permissions')
-          await supabase.functions.invoke('cross-platform-auth', {
+          const { error: accessError } = await supabase
+            .from('user_platform_access')
+            .upsert({
+              user_id: user.id,
+              platform_name: platform,
+              access_token: token,
+              is_active: true,
+              expires_at: validationData.expires_at || null,
+              last_accessed: new Date().toISOString()
+            })
+
+          if (accessError) {
+            console.error('Error storing platform access:', accessError)
+            throw new Error('Failed to store authentication')
+          }
+
+          toast.success(`Successfully connected to ${platform}`)
+          navigate(`/project/${searchParams.get('project_id') || ''}`, { replace: true })
+        } else {
+          // If no user is logged in, create a new session
+          const { data: sessionData, error: sessionError } = await supabase.functions.invoke('cross-platform-auth', {
             body: {
-              action: 'sync_permissions',
+              action: 'create_session',
               user_data: {
-                id: user.id,
-                platform_permissions: {
-                  [platform]: true
-                }
-              }
+                id: validationData.user_id,
+                email: validationData.email,
+                full_name: validationData.full_name || validationData.email
+              },
+              platform
             }
           })
-          
-          toast.success(`Successfully connected to ${platform}`)
-          navigate('/', { replace: true })
-          return
-        }
 
-        // Create session for new user
-        console.log('Creating new user session')
-        const { data: sessionData, error: sessionError } = await supabase.functions.invoke('cross-platform-auth', {
-          body: {
-            action: 'create_session',
-            user_data: {
-              id: validationData.user_id,
-              email: validationData.email,
-              full_name: validationData.full_name || validationData.email
-            },
-            platform
+          if (sessionError) {
+            console.error('Session creation failed:', sessionError)
+            throw sessionError
           }
-        })
 
-        if (sessionError) {
-          console.error('Session creation failed:', sessionError)
-          throw sessionError
-        }
-
-        // Redirect to session URL for automatic login
-        if (sessionData.session_url) {
-          console.log('Redirecting to session URL')
-          window.location.href = sessionData.session_url
-        } else {
-          toast.success(`Welcome from ${platform}!`)
-          navigate('/', { replace: true })
+          // Redirect to session URL for automatic login
+          if (sessionData.session_url) {
+            console.log('Redirecting to session URL')
+            window.location.href = sessionData.session_url
+          } else {
+            toast.success(`Welcome from ${platform}!`)
+            navigate('/', { replace: true })
+          }
         }
 
       } catch (error) {

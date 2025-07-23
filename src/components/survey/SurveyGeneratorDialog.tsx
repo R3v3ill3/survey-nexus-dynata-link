@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ExternalLink, Import, Shield, Clock, Users, AlertCircle, RefreshCw } from 'lucide-react'
+import { ExternalLink, Import, Shield, Clock, Users, AlertCircle, RefreshCw, Plus, LogIn } from 'lucide-react'
 import { useSurveyGenerator } from '@/hooks/useSurveyGenerator'
 import { TierUpgradePrompt } from '@/components/TierUpgradePrompt'
 import { useMembershipTier } from '@/hooks/useMembershipTier'
@@ -18,7 +18,17 @@ interface SurveyGeneratorDialogProps {
 
 export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGeneratorDialogProps) {
   const [open, setOpen] = useState(false)
-  const { surveys, loading, hasAccess, isAuthenticated, fetchSurveys, importSurvey, refreshAuthentication } = useSurveyGenerator()
+  const { 
+    surveys, 
+    loading, 
+    hasAccess, 
+    isAuthenticated, 
+    fetchSurveys, 
+    importSurvey, 
+    refreshAuthentication,
+    initiateAuthentication,
+    createSurvey
+  } = useSurveyGenerator()
   const { tierInfo, allTiers } = useMembershipTier()
 
   useEffect(() => {
@@ -98,45 +108,34 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
                 Authentication Required
               </CardTitle>
               <CardDescription>
-                The Survey Generator platform needs to authenticate with your account
+                Connect to Survey Generator to import surveys
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
                 <div className="text-sm text-blue-800">
-                  <p className="font-medium mb-1">Integration Setup Required</p>
-                  <p>The Survey Generator platform (poll-assistant.reveille.net.au) needs to authenticate with your account using these details:</p>
-                </div>
-              </div>
-              
-              <div className="bg-muted p-4 rounded-lg space-y-2">
-                <div className="text-sm">
-                  <p className="font-medium">Sync Endpoint:</p>
-                  <code className="text-xs bg-background p-1 rounded">
-                    https://dmyajxekgerixzojzlej.supabase.co/functions/v1/sync-to-survey-generator
-                  </code>
-                </div>
-                <div className="text-sm">
-                  <p className="font-medium">Auth Endpoint:</p>
-                  <code className="text-xs bg-background p-1 rounded">
-                    https://dmyajxekgerixzojzlej.supabase.co/functions/v1/cross-platform-auth
-                  </code>
-                </div>
-                <div className="text-sm">
-                  <p className="font-medium">Platform ID:</p>
-                  <code className="text-xs bg-background p-1 rounded">pop-poll.reveille.net.au</code>
+                  <p className="font-medium mb-1">Connect to Survey Generator</p>
+                  <p>You need to authenticate with Survey Generator to import surveys into your project.</p>
                 </div>
               </div>
 
               <div className="flex gap-2">
                 <Button 
-                  onClick={refreshAuthentication} 
+                  onClick={initiateAuthentication} 
                   disabled={loading}
                   className="flex-1"
                 >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  {loading ? 'Connecting...' : 'Connect to Survey Generator'}
+                </Button>
+                <Button 
+                  onClick={refreshAuthentication} 
+                  variant="outline"
+                  disabled={loading}
+                >
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  {loading ? 'Checking...' : 'Check Authentication'}
+                  {loading ? 'Checking...' : 'Check Status'}
                 </Button>
               </div>
             </CardContent>
@@ -150,9 +149,16 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
                   Select a survey to import into your project
                 </p>
               </div>
-              <Button onClick={fetchSurveys} variant="outline" size="sm" disabled={loading}>
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={createSurvey} variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Survey
+                </Button>
+                <Button onClick={fetchSurveys} variant="outline" size="sm" disabled={loading}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              </div>
             </div>
 
             <Separator />
@@ -166,9 +172,13 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
                 <CardContent className="flex flex-col items-center justify-center py-8">
                   <ExternalLink className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-medium mb-2">No surveys found</h3>
-                  <p className="text-muted-foreground text-center">
-                    No surveys were found in your Survey Generator account
+                  <p className="text-muted-foreground text-center mb-4">
+                    You haven't created any surveys yet. Create your first survey to get started.
                   </p>
+                  <Button onClick={createSurvey} variant="outline">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Survey
+                  </Button>
                 </CardContent>
               </Card>
             ) : (

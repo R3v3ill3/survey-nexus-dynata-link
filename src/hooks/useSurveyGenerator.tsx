@@ -49,27 +49,61 @@ export const useSurveyGenerator = () => {
       setHasAccess(tierAccess)
       
       if (tierAccess) {
-        // Check authentication status with the Survey Generator API
-        const { data: authData, error: authError } = await supabase.functions.invoke('survey-generator-api', {
-          body: {
-            action: 'check_authentication',
-            user_id: user.id
-          }
-        })
-
-        if (authError) {
-          console.error('Error checking authentication:', authError)
-          setIsAuthenticated(false)
-          return
-        }
-
-        setIsAuthenticated(authData.authenticated)
+        await checkAuthentication()
       }
     } catch (error) {
       console.error('Error checking Survey Generator access:', error)
       setHasAccess(false)
       setIsAuthenticated(false)
     }
+  }
+
+  const checkAuthentication = async () => {
+    if (!user) return
+
+    try {
+      // Check if user has platform access record
+      const { data: platformAccess, error: platformError } = await supabase
+        .from('user_platform_access')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('platform_name', 'survey_generator')
+        .eq('is_active', true)
+        .single()
+
+      if (platformError && platformError.code !== 'PGRST116') {
+        console.error('Error checking platform access:', platformError)
+        setIsAuthenticated(false)
+        return
+      }
+
+      // If we have a record, check if it's still valid
+      if (platformAccess) {
+        const isExpired = platformAccess.expires_at && new Date(platformAccess.expires_at) < new Date()
+        setIsAuthenticated(!isExpired)
+      } else {
+        setIsAuthenticated(false)
+      }
+    } catch (error) {
+      console.error('Error checking authentication:', error)
+      setIsAuthenticated(false)
+    }
+  }
+
+  const initiateAuthentication = () => {
+    if (!user) return
+
+    // Generate authentication URL for Survey Generator
+    const surveyGeneratorUrl = 'https://poll-assistant.reveille.net.au'
+    const redirectUrl = `${window.location.origin}/auth/cross-platform`
+    const authUrl = `${surveyGeneratorUrl}/auth/cross-platform?` +
+      `redirect_url=${encodeURIComponent(redirectUrl)}&` +
+      `platform_id=pop-poll.reveille.net.au&` +
+      `user_id=${user.id}&` +
+      `email=${encodeURIComponent(user.email || '')}`
+
+    // Open Survey Generator for authentication
+    window.open(authUrl, '_blank')
   }
 
   const fetchSurveys = async () => {
@@ -100,6 +134,16 @@ export const useSurveyGenerator = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const createSurvey = () => {
+    if (!user) return
+
+    const surveyGeneratorUrl = 'https://poll-assistant.reveille.net.au'
+    const createUrl = `${surveyGeneratorUrl}/create-survey?user_id=${user.id}`
+    
+    window.open(createUrl, '_blank')
+    toast.info('Opening Survey Generator to create a new survey. After creating, return here to import it.')
   }
 
   const importSurvey = async (surveyId: string, projectId: string) => {
@@ -149,7 +193,7 @@ export const useSurveyGenerator = () => {
 
     setLoading(true)
     try {
-      await checkAccess()
+      await checkAuthentication()
       if (isAuthenticated) {
         toast.success('Authentication status refreshed')
       }
@@ -168,6 +212,8 @@ export const useSurveyGenerator = () => {
     isAuthenticated,
     fetchSurveys,
     importSurvey,
-    refreshAuthentication
+    refreshAuthentication,
+    initiateAuthentication,
+    createSurvey
   }
 }

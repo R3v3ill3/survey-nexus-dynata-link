@@ -18,7 +18,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
-    const { action, token, platform, user_data, user_id, project_id } = await req.json()
+    const { action, token, platform, user_data, user_id, project_id, status } = await req.json()
     
     console.log('Cross-platform auth request:', { action, platform, user_id })
 
@@ -27,13 +27,30 @@ serve(async (req) => {
         // Handle authentication initiation for Survey Generator
         if (platform === 'survey_generator') {
           try {
-            // Generate a session token for the user
+            // Fetch user profile data to include in token
+            const { data: profile, error: profileError } = await supabaseClient
+              .from('profiles')
+              .select('email, full_name, membership_tier')
+              .eq('id', user_id)
+              .single()
+
+            if (profileError) {
+              console.error('Error fetching user profile:', profileError)
+              throw new Error('Failed to fetch user data')
+            }
+
+            // Generate a secure token with user data
             const authToken = btoa(JSON.stringify({
               user_id,
               project_id,
               platform: 'survey_generator',
               timestamp: Date.now(),
-              expires_at: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+              expires_at: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
+              user_data: {
+                email: profile.email,
+                full_name: profile.full_name,
+                membership_tier: profile.membership_tier
+              }
             }))
 
             // Store the pending authentication
@@ -55,14 +72,24 @@ serve(async (req) => {
               throw new Error('Failed to store authentication')
             }
 
-            // Return success with the redirect URL
-            const redirectUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cross-platform-auth`
+            // Return success with the enhanced redirect URL
+            const mainPlatformUrl = Deno.env.get('MAIN_PLATFORM_URL') || 'https://dmyajxekgerixzojzlej.supabase.co'
+            const callbackUrl = `${mainPlatformUrl}/auth/cross-platform-callback`
             const surveyGeneratorUrl = Deno.env.get('SURVEY_GENERATOR_URL') || 'https://poll-assistant.reveille.net.au'
+            
+            const authUrl = `${surveyGeneratorUrl}/auth/cross-platform-callback?` +
+              `token=${authToken}&` +
+              `platform=pop-poll&` +
+              `callback_url=${encodeURIComponent(callbackUrl)}&` +
+              `project_id=${project_id}&` +
+              `user_email=${encodeURIComponent(profile.email)}&` +
+              `user_name=${encodeURIComponent(profile.full_name || '')}&` +
+              `tier=${profile.membership_tier}`
             
             return new Response(
               JSON.stringify({ 
                 success: true,
-                auth_url: `${surveyGeneratorUrl}?token=${authToken}&redirect_url=${encodeURIComponent(redirectUrl)}&project_id=${project_id}`
+                auth_url: authUrl
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
@@ -161,6 +188,73 @@ serve(async (req) => {
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
+
+      case 'process_callback':
+        // Handle callback from Survey Generator
+        try {
+          if (!token) {
+            throw new Error('No token provided in callback')
+          }
+
+          // Decode and validate the token
+          const tokenData = JSON.parse(atob(token))
+          
+          // Verify token hasn't expired
+          if (tokenData.expires_at && tokenData.expires_at < Date.now()) {
+            throw new Error('Token has expired')
+          }
+
+          // Verify the token matches what we have stored
+          const { data: platformAccess, error: accessError } = await supabaseClient
+            .from('user_platform_access')
+            .select('*')
+            .eq('user_id', tokenData.user_id)
+            .eq('platform_name', platform)
+            .eq('access_token', token)
+            .maybeSingle()
+
+          if (accessError || !platformAccess) {
+            throw new Error('Invalid or expired authentication token')
+          }
+
+          // Update authentication status based on callback status
+          const updateData = status === 'success' 
+            ? {
+                last_accessed: new Date().toISOString(),
+                is_active: true
+              }
+            : {
+                is_active: false
+              }
+
+          const { error: updateError } = await supabaseClient
+            .from('user_platform_access')
+            .update(updateData)
+            .eq('user_id', tokenData.user_id)
+            .eq('platform_name', platform)
+
+          if (updateError) {
+            console.error('Error updating platform access:', updateError)
+            throw new Error('Failed to update authentication status')
+          }
+
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              authenticated: status === 'success',
+              user_id: tokenData.user_id,
+              project_id: tokenData.project_id
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+
+        } catch (error) {
+          console.error('Callback processing error:', error)
+          return new Response(
+            JSON.stringify({ error: error.message }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
 
       case 'sync_permissions':
         // Sync platform permissions

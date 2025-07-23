@@ -30,6 +30,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/auth/cross-platform" element={<CrossPlatformAuthHandler />} />
+            <Route path="/auth/cross-platform-callback" element={<CrossPlatformAuthHandler />} />
             <Route path="/select-tier" element={
               <ProtectedRoute>
                 <TierSelection />

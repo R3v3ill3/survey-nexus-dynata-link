@@ -15,9 +15,10 @@ export const CrossPlatformAuthHandler = () => {
     const handleCrossPlatformAuth = async () => {
       const token = searchParams.get('token')
       const platform = searchParams.get('platform') || 'survey_generator'
+      const status = searchParams.get('status') || 'success'
       const projectId = searchParams.get('project_id')
       
-      console.log('Cross-platform auth params:', { token: !!token, platform, projectId })
+      console.log('Cross-platform auth params:', { token: !!token, platform, status, projectId })
 
       // Only process if we have a token parameter
       if (!token) {
@@ -35,40 +36,35 @@ export const CrossPlatformAuthHandler = () => {
       setIsProcessing(true)
 
       try {
-        console.log('Processing cross-platform auth:', { platform, tokenPresent: !!token })
+        console.log('Processing cross-platform auth callback:', { platform, status, tokenPresent: !!token })
 
-        // For Survey Generator, we already have the token stored during initiation
-        // We just need to verify it's still valid and update the authentication status
-        const { data: platformAccess, error: accessError } = await supabase
-          .from('user_platform_access')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('platform_name', platform)
-          .eq('access_token', token)
-          .maybeSingle()
+        // Use the enhanced callback processing endpoint
+        const { data, error } = await supabase.functions.invoke('cross-platform-auth', {
+          body: {
+            action: 'process_callback',
+            token,
+            platform,
+            status,
+            user_id: user.id
+          }
+        })
 
-        if (accessError || !platformAccess) {
-          console.error('Platform access validation failed:', accessError)
-          throw new Error('Invalid authentication token')
+        if (error) {
+          console.error('Callback processing error:', error)
+          throw new Error(error.message || 'Failed to process authentication callback')
         }
 
-        // Update last accessed time
-        const { error: updateError } = await supabase
-          .from('user_platform_access')
-          .update({
-            last_accessed: new Date().toISOString(),
-            is_active: true
-          })
-          .eq('user_id', user.id)
-          .eq('platform_name', platform)
-
-        if (updateError) {
-          console.error('Error updating platform access:', updateError)
-          throw new Error('Failed to update authentication status')
+        if (data.success) {
+          if (data.authenticated) {
+            console.log('Authentication successful')
+            toast.success(`Successfully connected to ${platform === 'survey_generator' ? 'Survey Generator' : platform}`)
+          } else {
+            console.log('Authentication failed on Survey Generator side')
+            toast.error('Authentication was cancelled or failed on Survey Generator')
+          }
+        } else {
+          throw new Error('Callback processing failed')
         }
-
-        console.log('Platform access updated successfully')
-        toast.success(`Successfully connected to ${platform}`)
         
         // Redirect back to the project page
         const redirectPath = projectId ? `/project/${projectId}` : '/dashboard'

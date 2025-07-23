@@ -83,106 +83,104 @@ const TierSelection = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold text-foreground mb-4">
-            Choose Your Plan
-          </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Select the plan that best fits your survey project needs. 
-            All plans are currently free for testing.
-          </p>
-        </div>
+    <div className="container mx-auto px-4 py-16">
+      <div className="text-center mb-12">
+        <h1 className="text-3xl font-bold text-foreground mb-4">
+          Choose Your Plan
+        </h1>
+        <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          Select the plan that best fits your survey project needs. 
+          All plans are currently free for testing.
+        </p>
+      </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {allTiers.map((tier) => (
-            <Card 
-              key={tier.id}
-              className={`relative border-2 transition-all hover:shadow-lg ${
-                selectedTier === tier.tier 
-                  ? "border-primary shadow-lg" 
-                  : "border-muted/50"
-              }`}
-            >
-              {getTierBadge(tier.tier) && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  {getTierBadge(tier.tier)}
+      <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        {allTiers.map((tier) => (
+          <Card 
+            key={tier.id}
+            className={`relative border-2 transition-all hover:shadow-lg ${
+              selectedTier === tier.tier 
+                ? "border-primary shadow-lg" 
+                : "border-muted/50"
+            }`}
+          >
+            {getTierBadge(tier.tier) && (
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                {getTierBadge(tier.tier)}
+              </div>
+            )}
+            
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto mb-4">
+                {getTierIcon(tier.tier)}
+              </div>
+              <CardTitle className="text-2xl">{tier.name}</CardTitle>
+              <CardDescription className="text-sm">
+                {tier.description}
+              </CardDescription>
+              <div className="mt-4">
+                <span className="text-3xl font-bold">$0</span>
+                <span className="text-muted-foreground">/month</span>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Testing period
                 </div>
-              )}
-              
-              <CardHeader className="text-center pb-4">
-                <div className="mx-auto mb-4">
-                  {getTierIcon(tier.tier)}
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Projects</span>
+                  <span className="font-medium">
+                    {tier.max_projects === -1 ? "Unlimited" : tier.max_projects}
+                  </span>
                 </div>
-                <CardTitle className="text-2xl">{tier.name}</CardTitle>
-                <CardDescription className="text-sm">
-                  {tier.description}
-                </CardDescription>
-                <div className="mt-4">
-                  <span className="text-3xl font-bold">$0</span>
-                  <span className="text-muted-foreground">/month</span>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Testing period
+                <div className="flex items-center justify-between text-sm">
+                  <span>Line Items per Project</span>
+                  <span className="font-medium">
+                    {tier.max_line_items_per_project === -1 ? "Unlimited" : tier.max_line_items_per_project}
+                  </span>
+                </div>
+                {tier.quota_generator_access && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-primary" />
+                    <span>Quota Generator</span>
                   </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Projects</span>
-                    <span className="font-medium">
-                      {tier.max_projects === -1 ? "Unlimited" : tier.max_projects}
-                    </span>
+                )}
+                {tier.survey_generator_access && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-primary" />
+                    <span>Survey Generator</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Line Items per Project</span>
-                    <span className="font-medium">
-                      {tier.max_line_items_per_project === -1 ? "Unlimited" : tier.max_line_items_per_project}
-                    </span>
+                )}
+                {tier.dynata_api_access && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-primary" />
+                    <span>Dynata API</span>
                   </div>
-                  {tier.quota_generator_access && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-primary" />
-                      <span>Quota Generator</span>
-                    </div>
-                  )}
-                  {tier.survey_generator_access && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-primary" />
-                      <span>Survey Generator</span>
-                    </div>
-                  )}
-                  {tier.dynata_api_access && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-primary" />
-                      <span>Dynata API</span>
-                    </div>
-                  )}
-                </div>
+                )}
+              </div>
 
-                <Button
-                  className="w-full"
-                  variant={selectedTier === tier.tier ? "default" : "outline"}
-                  onClick={() => handleSelectTier(tier.tier)}
-                  disabled={isUpdating}
-                >
-                  {isUpdating ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  {selectedTier === tier.tier ? "Selected" : "Select Plan"}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              <Button
+                className="w-full"
+                variant={selectedTier === tier.tier ? "default" : "outline"}
+                onClick={() => handleSelectTier(tier.tier)}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                {selectedTier === tier.tier ? "Selected" : "Select Plan"}
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-        <div className="text-center mt-12">
-          <p className="text-sm text-muted-foreground">
-            You can change your plan anytime in your account settings
-          </p>
-        </div>
+      <div className="text-center mt-12">
+        <p className="text-sm text-muted-foreground">
+          You can change your plan anytime in your account settings
+        </p>
       </div>
     </div>
   );

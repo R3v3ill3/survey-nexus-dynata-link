@@ -14,6 +14,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Index from "./pages/Index";
 import AuthPage from "./components/AuthPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Layout from "./components/Layout";
 import NotFound from "./pages/NotFound";
 import { AdminConfiguration } from "./pages/AdminConfiguration";
 
@@ -33,27 +34,37 @@ const App = () => (
             <Route path="/auth/cross-platform-callback" element={<CrossPlatformAuthHandler />} />
             <Route path="/select-tier" element={
               <ProtectedRoute>
-                <TierSelection />
+                <Layout>
+                  <TierSelection />
+                </Layout>
               </ProtectedRoute>
             } />
             <Route path="/dashboard" element={
               <ProtectedRoute>
-                <Dashboard />
+                <Layout>
+                  <Dashboard />
+                </Layout>
               </ProtectedRoute>
             } />
             <Route path="/project/:id" element={
               <ProtectedRoute>
-                <ProjectDetail />
+                <Layout>
+                  <ProjectDetail />
+                </Layout>
               </ProtectedRoute>
             } />
             <Route path="/legacy" element={
               <ProtectedRoute>
-                <Index />
+                <Layout>
+                  <Index />
+                </Layout>
               </ProtectedRoute>
             } />
             <Route path="/admin" element={
               <ProtectedRoute>
-                <AdminConfiguration />
+                <Layout>
+                  <AdminConfiguration />
+                </Layout>
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />

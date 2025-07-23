@@ -147,41 +147,28 @@ serve(async (req) => {
             throw new Error('Survey Generator access token has expired. Please authenticate again.')
           }
 
-          // For now, return mock surveys since we don't have a real external API to call
-          // In a real implementation, this would call the Survey Generator API
-          const mockSurveys = [
-            {
-              id: 'survey_1',
-              title: 'Customer Satisfaction Survey',
-              description: 'A comprehensive survey about customer satisfaction',
-              estimated_length: 10,
-              survey_url: 'https://poll-assistant.reveille.net.au/surveys/survey_1',
-              status: 'active',
-              questions: [
-                { id: 'q1', type: 'rating', text: 'How satisfied are you with our service?' },
-                { id: 'q2', type: 'text', text: 'What can we improve?' }
-              ],
-              target_audience: { age_range: '18-65', location: 'Australia' },
-              quota_requirements: { min_responses: 100, max_responses: 500 }
+          // Make actual API call to Survey Generator
+          const surveyGeneratorUrl = Deno.env.get('SURVEY_GENERATOR_URL') || 'https://poll-assistant.reveille.net.au'
+          const apiUrl = `${surveyGeneratorUrl}/api/surveys`
+          
+          console.log('Fetching surveys from:', apiUrl)
+          
+          const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${platformAccess.access_token}`,
+              'Content-Type': 'application/json',
             },
-            {
-              id: 'survey_2',
-              title: 'Product Feedback Survey',
-              description: 'Survey about our latest product features',
-              estimated_length: 15,
-              survey_url: 'https://poll-assistant.reveille.net.au/surveys/survey_2',
-              status: 'draft',
-              questions: [
-                { id: 'q1', type: 'multiple_choice', text: 'Which feature do you use most?' },
-                { id: 'q2', type: 'rating', text: 'Rate the user interface' }
-              ],
-              target_audience: { age_range: '25-55', location: 'Global' },
-              quota_requirements: { min_responses: 50, max_responses: 200 }
-            }
-          ]
+          })
+
+          if (!response.ok) {
+            throw new Error(`Survey Generator API returned ${response.status}: ${response.statusText}`)
+          }
+
+          const surveysData = await response.json()
           
           return new Response(
-            JSON.stringify({ surveys: mockSurveys }),
+            JSON.stringify({ surveys: surveysData.surveys || [] }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
 

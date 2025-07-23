@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
@@ -9,17 +9,19 @@ export const CrossPlatformAuthHandler = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const [isProcessing, setIsProcessing] = useState(false)
 
   useEffect(() => {
     const handleCrossPlatformAuth = async () => {
       const token = searchParams.get('token')
       const platform = searchParams.get('platform')
       
-      // Handle incoming authentication token from external platforms
+      // Only process if we have both token and platform parameters
       if (!token || !platform) {
-        console.log('No token or platform in URL parameters')
         return
       }
+
+      setIsProcessing(true)
 
       try {
         console.log('Processing cross-platform auth:', { platform, tokenPresent: !!token })
@@ -92,11 +94,18 @@ export const CrossPlatformAuthHandler = () => {
         console.error('Cross-platform auth error:', error)
         toast.error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
         navigate('/', { replace: true })
+      } finally {
+        setIsProcessing(false)
       }
     }
 
     handleCrossPlatformAuth()
   }, [searchParams, navigate, user])
+
+  // Only render loading screen if we're actually processing authentication
+  if (!isProcessing) {
+    return null
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen">

@@ -25,7 +25,7 @@ const AuthPage = () => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/");
+        navigate("/dashboard");
       }
     };
     checkUser();
@@ -49,7 +49,7 @@ const AuthPage = () => {
           title: "Success",
           description: "Successfully signed in!",
         });
-        navigate("/");
+        navigate("/dashboard");
       }
     } catch (err) {
       setError("An unexpected error occurred");
@@ -80,8 +80,9 @@ const AuthPage = () => {
       } else {
         toast({
           title: "Success",
-          description: "Please check your email to confirm your account!",
+          description: "Welcome! Please select your plan to continue.",
         });
+        navigate("/select-tier");
       }
     } catch (err) {
       setError("An unexpected error occurred");
@@ -91,11 +92,11 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md border-muted/50">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Multi-Modal Polling Platform</CardTitle>
-          <CardDescription>Sign in to your account or create a new one</CardDescription>
+          <CardTitle className="text-3xl font-bold text-foreground">Welcome Back</CardTitle>
+          <CardDescription className="text-muted-foreground">Sign in to continue to your projects</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="space-y-4">

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
@@ -115,10 +116,15 @@ export const useSurveyGenerator = () => {
 
       console.log('Authentication initiated successfully:', data)
       
-      // Open the authentication URL
+      // Use regular redirect instead of popup to avoid popup blockers
       if (data.auth_url) {
-        window.open(data.auth_url, '_blank')
-        toast.info('Please complete authentication in the Survey Generator window')
+        // Store the current location so we can return here after auth
+        sessionStorage.setItem('survey_generator_return_url', window.location.href)
+        
+        // Redirect to the Survey Generator authentication page
+        window.location.href = data.auth_url
+        
+        toast.info('Redirecting to Survey Generator for authentication...')
       } else {
         throw new Error('No authentication URL received')
       }
@@ -180,8 +186,13 @@ export const useSurveyGenerator = () => {
       }
 
       if (data.survey_url) {
-        window.open(data.survey_url, '_blank')
-        toast.info('Opening Survey Generator to create a new survey. After creating, return here to refresh and import it.')
+        // Store the current location so we can return here after creating survey
+        sessionStorage.setItem('survey_generator_return_url', window.location.href)
+        
+        // Redirect to Survey Generator to create survey
+        window.location.href = data.survey_url
+        
+        toast.info('Redirecting to Survey Generator to create survey...')
       } else {
         toast.info('Survey creation initiated. Please check Survey Generator.')
       }

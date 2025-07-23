@@ -66,14 +66,30 @@ export const CrossPlatformAuthHandler = () => {
           throw new Error('Callback processing failed')
         }
         
-        // Redirect back to the project page
-        const redirectPath = projectId ? `/project/${projectId}` : '/dashboard'
-        navigate(redirectPath, { replace: true })
+        // Check if we have a stored return URL from sessionStorage
+        const returnUrl = sessionStorage.getItem('survey_generator_return_url')
+        if (returnUrl) {
+          sessionStorage.removeItem('survey_generator_return_url')
+          // Use window.location.href to ensure we navigate to the full URL
+          window.location.href = returnUrl
+        } else {
+          // Fallback to project page or dashboard
+          const redirectPath = projectId ? `/project/${projectId}` : '/dashboard'
+          navigate(redirectPath, { replace: true })
+        }
 
       } catch (error) {
         console.error('Cross-platform auth error:', error)
         toast.error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-        navigate('/dashboard', { replace: true })
+        
+        // Still try to return to the original location on error
+        const returnUrl = sessionStorage.getItem('survey_generator_return_url')
+        if (returnUrl) {
+          sessionStorage.removeItem('survey_generator_return_url')
+          window.location.href = returnUrl
+        } else {
+          navigate('/dashboard', { replace: true })
+        }
       } finally {
         setIsProcessing(false)
       }

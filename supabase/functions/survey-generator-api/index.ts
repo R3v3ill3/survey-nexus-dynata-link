@@ -25,15 +25,23 @@ serve(async (req) => {
 
     const { action, access_token, user_id, callback_url } = await req.json()
     const surveyGeneratorUrl = Deno.env.get('SURVEY_GENERATOR_URL')
+    const mainPlatformUrl = Deno.env.get('MAIN_PLATFORM_URL')
+    const syncToken = Deno.env.get('SURVEY_GENERATOR_SYNC_TOKEN')
     
+    console.log('Survey Generator API request:', { 
+      action, 
+      surveyGeneratorUrl: surveyGeneratorUrl ? 'configured' : 'missing',
+      mainPlatformUrl: mainPlatformUrl ? 'configured' : 'missing',
+      syncToken: syncToken ? 'configured' : 'missing'
+    })
+
     if (!surveyGeneratorUrl) {
+      console.error('SURVEY_GENERATOR_URL environment variable not configured')
       return new Response(
         JSON.stringify({ error: 'Survey Generator URL not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    console.log('Survey Generator API request:', { action, surveyGeneratorUrl })
 
     switch (action) {
       case 'fetch_surveys':
@@ -45,6 +53,7 @@ serve(async (req) => {
         }
 
         try {
+          console.log('Fetching surveys from Survey Generator...')
           const response = await fetch(`${surveyGeneratorUrl}/api/surveys`, {
             method: 'GET',
             headers: {
@@ -53,11 +62,16 @@ serve(async (req) => {
             }
           })
 
+          console.log('Survey Generator response status:', response.status)
+
           if (!response.ok) {
-            throw new Error(`Survey Generator API responded with ${response.status}`)
+            const errorText = await response.text()
+            console.error('Survey Generator API error:', errorText)
+            throw new Error(`Survey Generator API responded with ${response.status}: ${errorText}`)
           }
 
           const surveysData = await response.json()
+          console.log('Surveys fetched successfully:', surveysData.surveys?.length || 0)
           
           return new Response(
             JSON.stringify({ surveys: surveysData.surveys || [] }),
@@ -80,14 +94,24 @@ serve(async (req) => {
           )
         }
 
+        if (!mainPlatformUrl) {
+          console.error('MAIN_PLATFORM_URL environment variable not configured')
+          return new Response(
+            JSON.stringify({ error: 'Main platform URL not configured' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
         try {
           const authUrl = `${surveyGeneratorUrl}/oauth/authorize?` +
             `response_type=code&` +
-            `client_id=${encodeURIComponent(Deno.env.get('MAIN_PLATFORM_URL') || '')}&` +
+            `client_id=${encodeURIComponent(mainPlatformUrl)}&` +
             `redirect_uri=${encodeURIComponent(callback_url)}&` +
             `state=${encodeURIComponent(user_id)}&` +
             `scope=surveys:read surveys:write`
 
+          console.log('Generated auth URL for user:', user_id)
+          
           return new Response(
             JSON.stringify({ auth_url: authUrl }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -111,7 +135,16 @@ serve(async (req) => {
           )
         }
 
+        if (!syncToken) {
+          console.error('SURVEY_GENERATOR_SYNC_TOKEN environment variable not configured')
+          return new Response(
+            JSON.stringify({ error: 'Sync token not configured' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
         try {
+          console.log('Exchanging code for token...')
           const tokenResponse = await fetch(`${surveyGeneratorUrl}/oauth/token`, {
             method: 'POST',
             headers: {
@@ -120,17 +153,20 @@ serve(async (req) => {
             body: JSON.stringify({
               grant_type: 'authorization_code',
               code,
-              client_id: Deno.env.get('MAIN_PLATFORM_URL'),
-              client_secret: Deno.env.get('SURVEY_GENERATOR_SYNC_TOKEN'),
+              client_id: mainPlatformUrl,
+              client_secret: syncToken,
               redirect_uri: callback_url
             })
           })
 
           if (!tokenResponse.ok) {
-            throw new Error(`Token exchange failed with ${tokenResponse.status}`)
+            const errorText = await tokenResponse.text()
+            console.error('Token exchange error:', errorText)
+            throw new Error(`Token exchange failed with ${tokenResponse.status}: ${errorText}`)
           }
 
           const tokenData = await tokenResponse.json()
+          console.log('Token exchange successful for user:', state)
           
           // Store platform access
           const { error: storeError } = await supabaseClient

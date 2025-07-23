@@ -45,17 +45,15 @@ export function SurveyManagement({ project }: SurveyManagementProps) {
 
     setLoading(true)
     try {
-      const { data, error } = await supabase.functions.invoke('survey-import', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        },
-        body: new URLSearchParams({ project_id: project.id })
-      })
+      // Fetch surveys directly from the surveys table
+      const { data, error } = await supabase
+        .from('surveys')
+        .select('*')
+        .eq('project_id', project.id)
 
       if (error) throw error
 
-      setSurveys(data.surveys || [])
+      setSurveys(data || [])
     } catch (error) {
       console.error('Error fetching surveys:', error)
       toast.error('Failed to load surveys')
@@ -84,8 +82,20 @@ export function SurveyManagement({ project }: SurveyManagementProps) {
   }
 
   const handleStatusChange = async (surveyId: string, newStatus: string) => {
-    // TODO: Implement survey status change functionality
-    toast.info(`Survey status change to ${newStatus} - Coming soon!`)
+    try {
+      const { error } = await supabase
+        .from('surveys')
+        .update({ status: newStatus })
+        .eq('id', surveyId)
+
+      if (error) throw error
+
+      toast.success(`Survey status updated to ${newStatus}`)
+      fetchSurveys()
+    } catch (error) {
+      console.error('Error updating survey status:', error)
+      toast.error('Failed to update survey status')
+    }
   }
 
   const handleViewSurvey = (survey: Survey) => {

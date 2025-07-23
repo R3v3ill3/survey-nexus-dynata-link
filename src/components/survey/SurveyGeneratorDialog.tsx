@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ExternalLink, Import, Shield, Clock, Users } from 'lucide-react'
+import { ExternalLink, Import, Shield, Clock, Users, AlertCircle } from 'lucide-react'
 import { useSurveyGenerator } from '@/hooks/useSurveyGenerator'
 import { TierUpgradePrompt } from '@/components/TierUpgradePrompt'
 import { useMembershipTier } from '@/hooks/useMembershipTier'
@@ -18,15 +18,14 @@ interface SurveyGeneratorDialogProps {
 
 export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGeneratorDialogProps) {
   const [open, setOpen] = useState(false)
-  const [selectedSurvey, setSelectedSurvey] = useState<string | null>(null)
-  const { surveys, loading, hasAccess, fetchSurveys, importSurvey, authenticateWithSurveyGenerator } = useSurveyGenerator()
+  const { surveys, loading, hasAccess, isAuthenticated, fetchSurveys, importSurvey, authenticateWithSurveyGenerator } = useSurveyGenerator()
   const { tierInfo, allTiers } = useMembershipTier()
 
   useEffect(() => {
-    if (open && hasAccess) {
+    if (open && hasAccess && isAuthenticated) {
       fetchSurveys()
     }
-  }, [open, hasAccess])
+  }, [open, hasAccess, isAuthenticated])
 
   const handleImport = async (surveyId: string) => {
     try {
@@ -91,7 +90,7 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
           <DialogTitle>Import from Survey Generator</DialogTitle>
         </DialogHeader>
 
-        {!hasAccess ? (
+        {!isAuthenticated ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -102,10 +101,16 @@ export function SurveyGeneratorDialog({ project, onSurveyImported }: SurveyGener
                 Connect your Survey Generator account to import surveys
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button onClick={authenticateWithSurveyGenerator} className="w-full">
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <p className="text-sm text-blue-800">
+                  You need to authenticate with Survey Generator to access your surveys
+                </p>
+              </div>
+              <Button onClick={authenticateWithSurveyGenerator} className="w-full" disabled={loading}>
                 <Shield className="h-4 w-4 mr-2" />
-                Connect Survey Generator
+                {loading ? 'Connecting...' : 'Connect Survey Generator'}
               </Button>
             </CardContent>
           </Card>

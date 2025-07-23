@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -48,6 +47,7 @@ serve(async (req) => {
             const authPayload = {
               platform_id: 'pop-poll.reveille.net.au',
               sync_token: surveyGeneratorSyncToken,
+              action: 'initiate_auth',
               user_data: {
                 user_id: user_id,
                 email: profile.email,
@@ -119,7 +119,10 @@ serve(async (req) => {
             )
           }
         }
-        break
+        return new Response(
+          JSON.stringify({ error: 'Unsupported platform' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
 
       case 'validate_token':
         // Validate JWT token from Survey Generator
